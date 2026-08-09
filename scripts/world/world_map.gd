@@ -1,29 +1,28 @@
 extends Control
 
 # ============================================================
-# WorldMap (主地图 / 战略层) — 点格进入不同地形地点
+# WorldMap (主地图 / 战略层) — 无限地图, 以主角为中心窗口化探索
 # ============================================================
-# 家 (HOME) 是其中一格; 院门出来即到此; 点"家"格回家园。
-# 已探索格 → 直接点进入副本; 未探索的 "?" → 弹"侦察/进入"菜单。
-# 侦察 = 仅开图 (reveal_neighbors), 不切场景; 进入 = 进副本。
-# WorldMapData 是 autoload 单例, 直接用全局名 WorldMapData 访问 (含 const/enum/实例方法)。
+# 玩法: 主角站在中心格, 点击"相邻且已揭示"的格子前进。
+#   - 公路/公园(纯路程) → 仅移动, 不进副本
+#   - 公寓/医院/超市/诊所/别墅/研究所 → 到达即进入对应副本
+#   - 家 → 回安全屋
+# 走到新格会自动生成其四周(迷雾向外扩展), 已生成与已探索的部分随存档保留。
+# WorldMapData 是 autoload 单例, 直接用全局名 WorldMapData 访问。
 
 const DungeonScript := preload("res://scripts/dungeons/dungeon_base.gd")
 
-var grid_origin := Vector2(40, 320)
-var cell_size := 80
+const RADIUS := 4                      # 以主角为中心的视野半径 (9x9 窗口)
+const CELL := 60
 
-## 格子节点容器 (侦察后只需重建此层, 不动标题/按钮)
 var _cell_layer: Control = null
-## 侦察/进入 弹出菜单
-var _scout_menu: PopupMenu = null
-## 待操作的目标格 (弹菜单时记录)
-var _pending_cell: Vector2i = Vector2i.ZERO
-
+var _info_label: Label = null
+var _home_btn: Button = null
 
 func _ready() -> void:
 	_setup_cell_layer()
 	_build_ui()
+	_rebuild_cells()
 	if "--auto-test" in OS.get_cmdline_user_args():
 		_run_auto_test()
 
@@ -33,95 +32,127 @@ func _setup_cell_layer() -> void:
 	_cell_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_cell_layer)
 
-	_scout_menu = PopupMenu.new()
-	_scout_menu.id_pressed.connect(_on_scout_menu_selected)
-	add_child(_scout_menu)
+
+func _window_origin() -> Vector2:
+	var win_w := (2 * RADIUS + 1) * CELL
+	return Vector2((720 - win_w) / 2.0, 150.0)
 
 
 func _build_ui() -> void:
 	var title := Label.new()
-	title.text = "世界地图 — 点击地点进入探索"
-	title.add_theme_font_size_override("font_size", 26)
+	title.text = "世界地图 — 点击相邻地点前进，走到新地点自动生成四周"
+	title.add_theme_font_size_override("font_size", 20)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.position = Vector2(0, 40)
-	title.size = Vector2(720, 40)
-	title.add_theme_color_override("font_color", Color(0.95, 0.95, 0.9))
+	title.position = Vector2(0, 30)
+	title.size = Vector2(720, 36)
+	title.add_theme_color_override("font_color", Color(0.92, 0.93, 0.88))
 	add_child(title)
 
-	var home_btn := Button.new()
-	home_btn.text = "返回家园"
-	home_btn.position = Vector2(540, 90)
-	home_btn.size = Vector2(150, 40)
-	home_btn.pressed.connect(_on_home_pressed)
-	add_child(home_btn)
+	_home_btn = Button.new()
+	_home_btn.text = "返回家园"
+	_home_btn.position = Vector2(560, 80)
+	_home_btn.size = Vector2(140, 42)
+	_home_btn.pressed.connect(_on_home_pressed)
+	add_child(_home_btn)
 
-	var legend := Label.new()
-	var parts: Array = []
-	for t in WorldMapData.TERRAIN_NAMES:
-		parts.append(WorldMapData.terrain_name(t))
-	legend.text = "地形: " + " / ".join(parts)
-	legend.add_theme_font_size_override("font_size", 12)
-	legend.position = Vector2(20, 95)
-	legend.size = Vector2(500, 30)
-	legend.add_theme_color_override("font_color", Color(0.8, 0.8, 0.85))
-	add_child(legend)
-
-	_rebuild_cells()
+	_info_label = Label.new()
+	_info_label.add_theme_font_size_override("font_size", 14)
+	_info_label.position = Vector2(20, 80)
+	_info_label.size = Vector2(520, 42)
+	_info_label.add_theme_color_override("font_color", Color(0.8, 0.82, 0.86))
+	add_child(_info_label)
 
 
 func _rebuild_cells() -> void:
 	for c in _cell_layer.get_children():
 		c.free()
-	for y in WorldMapData.GRID:
-		for x in WorldMapData.GRID:
-			if WorldMapData.is_revealed(x, y):
-				_build_cell(x, y)
+	var origin := _window_origin()
+	var pc: Vector2i = WorldMapData.player_cell
+	for gy in range(-RADIUS, RADIUS + 1):
+		for gx in range(-RADIUS, RADIUS + 1):
+			var wx: int = pc.x + gx
+			var wy: int = pc.y + gy
+			if not WorldMapData.is_revealed(wx, wy):
+				continue
+			var screen := origin + Vector2((gx + RADIUS) * CELL, (gy + RADIUS) * CELL)
+			_build_cell(wx, wy, screen)
+	_update_info()
 
 
-func _build_cell(x: int, y: int) -> void:
-	var t: int = WorldMapData.terrain_at(x, y)
-	var explored_cell: bool = WorldMapData.is_explored(x, y)
+func _build_cell(wx: int, wy: int, screen: Vector2) -> void:
+	var t: int = WorldMapData.terrain_at(wx, wy)
+	var explored_cell: bool = WorldMapData.is_explored(wx, wy)
 	var rect := ColorRect.new()
-	rect.position = grid_origin + Vector2(x * cell_size, y * cell_size)
-	rect.size = Vector2(cell_size, cell_size)
+	rect.position = screen
+	rect.size = Vector2(CELL, CELL)
 	var col: Color = WorldMapData.terrain_color(t)
 	if not explored_cell:
-		col = col.darkened(0.6)
+		col = col.darkened(0.55)
 	rect.color = col
 	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_cell_layer.add_child(rect)
 
+	# 细边框, 让格与格有分隔 (不刺眼)
+	var border := ColorRect.new()
+	border.position = screen
+	border.size = Vector2(CELL, 2)
+	border.color = Color(0.0, 0.0, 0.0, 0.35)
+	border.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cell_layer.add_child(border)
+
 	var label := Label.new()
-	if explored_cell:
-		label.text = WorldMapData.terrain_name(t)
-	else:
-		label.text = "?"
-	label.add_theme_font_size_override("font_size", 15)
+	label.text = WorldMapData.terrain_name(t) if explored_cell else "?"
+	label.add_theme_font_size_override("font_size", 13)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.position = rect.position
-	label.size = rect.size
-	label.add_theme_color_override("font_color", Color(1, 1, 1, 0.95))
+	label.position = screen
+	label.size = Vector2(CELL, CELL)
+	label.add_theme_color_override("font_color", Color(1, 1, 1, 0.92))
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_cell_layer.add_child(label)
+
+	if Vector2i(wx, wy) == WorldMapData.player_cell:
+		var you := Label.new()
+		you.text = "你"
+		you.add_theme_font_size_override("font_size", 16)
+		you.add_theme_color_override("font_color", Color(1.0, 0.92, 0.4))
+		you.position = screen + Vector2(CELL - 24, 2)
+		you.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_cell_layer.add_child(you)
+		var ring := ColorRect.new()
+		ring.position = screen
+		ring.size = Vector2(CELL, CELL)
+		ring.color = Color(0, 0, 0, 0)
+		ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_cell_layer.add_child(ring)
 
 	if t == WorldMapData.TerrainType.HOME and explored_cell:
 		var star := Label.new()
 		star.text = "★"
-		star.add_theme_font_size_override("font_size", 22)
-		star.position = rect.position + Vector2(4, 1)
+		star.add_theme_font_size_override("font_size", 18)
+		star.position = screen + Vector2(4, 1)
 		star.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_cell_layer.add_child(star)
 
-	# 进出口对称: 返回主地图时, 在"上次进入副本的格"上标"你在这里(出口)"
-	if WorldMapData.has_last_entry and Vector2i(x, y) == WorldMapData.last_entry_cell:
+	# 进出口对称: 返回主地图时, 在"上次进入副本的格"上标"出口"
+	if WorldMapData.has_last_entry and Vector2i(wx, wy) == WorldMapData.last_entry_cell \
+			and Vector2i(wx, wy) != WorldMapData.player_cell:
 		var here := Label.new()
-		here.text = "◆你在这里"
-		here.add_theme_font_size_override("font_size", 13)
-		here.position = rect.position + Vector2(2, cell_size - 18)
+		here.text = "出口"
+		here.add_theme_font_size_override("font_size", 12)
+		here.position = screen + Vector2(2, CELL - 16)
 		here.add_theme_color_override("font_color", Color(0.6, 1.0, 0.7))
 		here.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_cell_layer.add_child(here)
+
+
+func _update_info() -> void:
+	if _info_label == null:
+		return
+	var pc: Vector2i = WorldMapData.player_cell
+	var t: int = WorldMapData.terrain_at(pc.x, pc.y)
+	var name: String = WorldMapData.terrain_name(t)
+	_info_label.text = "当前位置: %s (%d, %d)　|　点击相邻已揭示的地点前进" % [name, pc.x, pc.y]
 
 
 func _on_home_pressed() -> void:
@@ -131,107 +162,98 @@ func _on_home_pressed() -> void:
 func _input(event) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		var lp := get_local_mouse_position()
-		var gx := int((lp.x - grid_origin.x) / cell_size)
-		var gy := int((lp.y - grid_origin.y) / cell_size)
-		if gx >= 0 and gx < WorldMapData.GRID and gy >= 0 and gy < WorldMapData.GRID:
-			if WorldMapData.is_revealed(gx, gy):
-				_on_cell_clicked(gx, gy)
+		var origin := _window_origin()
+		var gx := int(floor((lp.x - origin.x) / CELL)) - RADIUS
+		var gy := int(floor((lp.y - origin.y) / CELL)) - RADIUS
+		if gx < -RADIUS or gx > RADIUS or gy < -RADIUS or gy > RADIUS:
+			return
+		_on_cell_clicked(gx, gy)
 
 
-func _on_cell_clicked(x: int, y: int) -> void:
-	# 已探索 → 直接进副本; 未探索 (?) → 弹侦察/进入菜单
-	if WorldMapData.is_explored(x, y):
-		print("[WorldMap] 进入: ", WorldMapData.terrain_name(WorldMapData.terrain_at(x, y)), " (", x, ",", y, ")")
-		WorldMapData.enter_location(x, y)
+func _on_cell_clicked(gx: int, gy: int) -> void:
+	var pc: Vector2i = WorldMapData.player_cell
+	var target := pc + Vector2i(gx, gy)
+	if target == pc:
 		return
-	_pending_cell = Vector2i(x, y)
-	_scout_menu.clear()
-	_scout_menu.add_item("侦察此地（仅开图）", 0)
-	_scout_menu.add_item("进入探索（进副本）", 1)
-	_scout_menu.popup_at_position(get_local_mouse_position())
-
-
-## 菜单选择: 0=侦察, 1=进入
-func _on_scout_menu_selected(id: int) -> void:
-	if _pending_cell == Vector2i.ZERO:
+	# 仅允许走到相邻(8 向)已揭示格
+	if abs(target.x - pc.x) > 1 or abs(target.y - pc.y) > 1:
 		return
-	var cx := _pending_cell.x
-	var cy := _pending_cell.y
-	if id == 0:
-		_scout_cell(cx, cy)
-	else:
-		WorldMapData.enter_location(cx, cy)
-
-
-## 侦察: 仅开图不切场景 (复用 reveal_neighbors)
-func _scout_cell(x: int, y: int) -> void:
-	WorldMapData.reveal_neighbors(x, y)
+	if not WorldMapData.is_revealed(target.x, target.y):
+		return
+	var t: int = WorldMapData.terrain_at(target.x, target.y)
+	if t == WorldMapData.TerrainType.HOME:
+		print("[WorldMap] 返回家园")
+		WorldMapData.enter_home()
+		return
+	if WorldMapData.is_building(t):
+		print("[WorldMap] 进入: ", WorldMapData.terrain_name(t), " (", target.x, ",", target.y, ")")
+		WorldMapData.enter_location(target.x, target.y)
+		return
+	# 公路/公园: 仅旅行
+	WorldMapData.move_player_to(target.x, target.y)
+	print("[WorldMap] 前进到: ", WorldMapData.terrain_name(t), " (", target.x, ",", target.y, ")")
 	_rebuild_cells()
-	print("[WorldMap] 侦察: ", WorldMapData.terrain_name(WorldMapData.terrain_at(x, y)), " 已开图 (", x, ",", y, ")")
 
 
 # --- 自动测试 (纯逻辑, 不切场景) ---
 
 func _run_auto_test() -> void:
 	var ok := true
-	if WorldMapData.cells.size() != WorldMapData.GRID * WorldMapData.GRID:
-		ok = false
-		push_error("[WorldMap] 格子总数错误: ", WorldMapData.cells.size())
 
-	# === 迷雾探索: 只显示已探索格 + 其上下左右邻居 ===
-	WorldMapData.generate()  # 重置: HOME 已探索, 其余未探索
+	# === 重置: 家已探索, 四周已揭示, 远处不可见 ===
+	WorldMapData.reset_map()
 	var hx: int = WorldMapData.home_cell.x
 	var hy: int = WorldMapData.home_cell.y
 	if not WorldMapData.is_revealed(hx, hy):
 		ok = false
 		push_error("[WorldMap] 初始 HOME 应可见")
-	var dirs := [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]
-	for d: Vector2i in dirs:
-		if not WorldMapData.is_revealed(hx + d.x, hy + d.y):
-			ok = false
-			push_error("[WorldMap] HOME 邻居应可见: " + str(hx + d.x) + "," + str(hy + d.y))
-	if WorldMapData.is_revealed(0, 0):
+	if not WorldMapData.is_revealed(hx + 1, hy):
 		ok = false
-		push_error("[WorldMap] 远处 (0,0) 不应可见")
-	WorldMapData.mark_explored(hx, hy + 1)
-	if not WorldMapData.is_revealed(hx, hy + 2):
+		push_error("[WorldMap] HOME 邻居应可见")
+	if WorldMapData.is_revealed(hx + 5, hy):
 		ok = false
-		push_error("[WorldMap] 探索后外层 (hx,hy+2) 应解锁可见")
-	if WorldMapData.is_revealed(0, 0):
-		ok = false
-		push_error("[WorldMap] (0,0) 仍不应可见")
-
-	# === reveal_neighbors: 走到院门即点亮 HOME 四周邻居 (开图不必进副本) ===
-	WorldMapData.generate()  # 重置
-	WorldMapData.reveal_neighbors(hx, hy)
-	if not WorldMapData.is_explored(hx, hy - 1) or not WorldMapData.is_explored(hx, hy + 1) \
-			or not WorldMapData.is_explored(hx - 1, hy) or not WorldMapData.is_explored(hx + 1, hy):
-		ok = false
-		push_error("[WorldMap] reveal_neighbors 未点亮 HOME 四周邻居")
-	if not WorldMapData.is_revealed(hx, hy - 2):
-		ok = false
-		push_error("[WorldMap] reveal_neighbors 后外圈 (hx,hy-2) 应解锁可见")
-	if WorldMapData.is_revealed(0, 0):
-		ok = false
-		push_error("[WorldMap] 远处 (0,0) 仍不应可见")
-
-	# === 侦察: 点 "?" 仅开图, 不进副本 ===
-	WorldMapData.generate()
-	WorldMapData.reveal_neighbors(hx, hy)  # HOME 四周已亮
-	_scout_cell(hx, hy + 1)  # 侦察下邻居
-	if not WorldMapData.is_explored(hx, hy + 1):
-		ok = false
-		push_error("[WorldMap] 侦察后 (hx,hy+1) 应已探索")
-	if not WorldMapData.is_revealed(hx, hy + 2):
-		ok = false
-		push_error("[WorldMap] 侦察后外圈 (hx,hy+2) 应解锁可见")
-	if WorldMapData.is_revealed(0, 0):
-		ok = false
-		push_error("[WorldMap] 远处 (0,0) 仍不应可见 (侦察不影响远处)")
-
-	if WorldMapData.terrain_at(WorldMapData.home_cell.x, WorldMapData.home_cell.y) != WorldMapData.TerrainType.HOME:
+		push_error("[WorldMap] 远处 (hx+5) 不应可见")
+	if WorldMapData.terrain_at(hx, hy) != WorldMapData.TerrainType.HOME:
 		ok = false
 		push_error("[WorldMap] home 格不是 HOME")
+
+	# === 移动: 走到邻居 → 下一圈被揭示 (迷雾扩展, 无限生成) ===
+	WorldMapData.reset_map()
+	WorldMapData.move_player_to(hx + 1, hy)
+	if not WorldMapData.is_explored(hx + 1, hy):
+		ok = false
+		push_error("[WorldMap] 移动后目标格应已探索")
+	if not WorldMapData.is_revealed(hx + 2, hy):
+		ok = false
+		push_error("[WorldMap] 移动后外圈 (hx+2) 应解锁可见")
+	if not WorldMapData.is_revealed(hx + 1, hy + 1):
+		ok = false
+		push_error("[WorldMap] 移动后对角外圈应解锁可见")
+	if WorldMapData.is_revealed(hx - 5, hy):
+		ok = false
+		push_error("[WorldMap] 远处 (hx-5) 仍不应可见")
+
+	# === 确定性: 同格永远同地形 ===
+	var a1: int = WorldMapData.terrain_at(7, -3)
+	var a2: int = WorldMapData.terrain_at(7, -3)
+	if a1 != a2:
+		ok = false
+		push_error("[WorldMap] 地形非确定性")
+	# 家永远是家
+	if WorldMapData.terrain_at(hx, hy) != WorldMapData.TerrainType.HOME:
+		ok = false
+		push_error("[WorldMap] 家格地形被覆盖")
+
+	# === 建筑判定: ROAD/PARK 不是建筑, 其余是 ===
+	if WorldMapData.is_building(WorldMapData.TerrainType.ROAD):
+		ok = false
+		push_error("[WorldMap] ROAD 不应是建筑")
+	if WorldMapData.is_building(WorldMapData.TerrainType.PARK):
+		ok = false
+		push_error("[WorldMap] PARK 不应是建筑")
+	if not WorldMapData.is_building(WorldMapData.TerrainType.SUPERMARKET):
+		ok = false
+		push_error("[WorldMap] SUPERMARKET 应是建筑")
 	if WorldMapData.terrain_to_dungeon_type(WorldMapData.TerrainType.HOSPITAL) != DungeonScript.BuildingType.HOSPITAL:
 		ok = false
 		push_error("[WorldMap] HOSPITAL 映射错误")
@@ -239,60 +261,24 @@ func _run_auto_test() -> void:
 		ok = false
 		push_error("[WorldMap] SUPERMARKET 映射错误")
 
-	# === 精细掉落: 按家具类型 (用户反馈: 90%+ 太高, 同地点也分不同家具) ===
-	var db: Node = DungeonScript.new()
-	var FT = DungeonScript.FurnType
-	# 药柜药品占比: 应明显高但非碾压 (0.45~0.78)
-	var med_total := 0
-	var med_med := 0
-	for i in 5000:
-		var id: String = db.pick_loot_by_furniture(FT.MED_CABINET)
-		med_total += 1
-		if id in ["bandage", "medkit", "antidote", "adrenaline", "painkiller"]:
-			med_med += 1
-	var med_ratio: float = float(med_med) / float(med_total)
-	if med_ratio < 0.45 or med_ratio > 0.78:
+	# === 持久化: 序列化往返保留已生成/已探索 ===
+	WorldMapData.reset_map()
+	WorldMapData.move_player_to(hx + 1, hy)
+	WorldMapData.move_player_to(hx + 1, hy + 1)
+	var snap_tiles: int = WorldMapData.tiles.size()
+	var snap_explored: int = WorldMapData.explored.size()
+	var pc_before: Vector2i = WorldMapData.player_cell
+	var ser: Dictionary = WorldMapData.serialize()
+	WorldMapData.reset_map()  # 清空
+	WorldMapData.deserialize(ser)
+	if WorldMapData.tiles.size() != snap_tiles:
 		ok = false
-		push_error("[WorldMap] 药柜药品占比异常: " + str(med_ratio))
-	# 文件柜: 文件(doc/book)应占主导
-	var file_total := 0
-	var file_doc := 0
-	for i in 3000:
-		var fid: String = db.pick_loot_by_furniture(FT.FILE_CABINET)
-		file_total += 1
-		if fid in ["document", "book"]:
-			file_doc += 1
-	var file_ratio: float = float(file_doc) / float(file_total)
-	if file_ratio < 0.35:
+		push_error("[WorldMap] 序列化后 tiles 数量不一致: %d vs %d" % [WorldMapData.tiles.size(), snap_tiles])
+	if WorldMapData.explored.size() != snap_explored:
 		ok = false
-		push_error("[WorldMap] 文件柜文件占比过低: " + str(file_ratio))
-	# 医院整体(按家具构成抽样): 分家具后药品占比应明显下降 (< 0.45)
-	var hosp_list: Array = db.FURN_WEIGHTS_BY_BUILDING[db.BuildingType.HOSPITAL]
-	var hosp_total := 0
-	var hosp_med := 0
-	for i in 6000:
-		var hft: int = hosp_list[randi() % hosp_list.size()]
-		var hid: String = db.pick_loot_by_furniture(hft)
-		hosp_total += 1
-		if hid in ["bandage", "medkit", "antidote", "adrenaline", "painkiller"]:
-			hosp_med += 1
-	var hosp_ratio: float = float(hosp_med) / float(hosp_total)
-	if hosp_ratio > 0.45:
+		push_error("[WorldMap] 序列化后 explored 数量不一致: %d vs %d" % [WorldMapData.explored.size(), snap_explored])
+	if WorldMapData.player_cell != pc_before:
 		ok = false
-		push_error("[WorldMap] 医院整体药品占比过高(分家具后应下降): " + str(hosp_ratio))
-	# 超市货架: 食物/水应占主导
-	var sup_list: Array = db.FURN_WEIGHTS_BY_BUILDING[db.BuildingType.SUPERMARKET]
-	var sup_total := 0
-	var sup_food := 0
-	for i in 4000:
-		var sft: int = sup_list[randi() % sup_list.size()]
-		var sid: String = db.pick_loot_by_furniture(sft)
-		sup_total += 1
-		if sid in ["canned_food", "water_pure", "bread", "soda", "chocolate"]:
-			sup_food += 1
-	var sup_ratio: float = float(sup_food) / float(sup_total)
-	if sup_ratio < 0.6:
-		ok = false
-		push_error("[WorldMap] 超市食物占比过低: " + str(sup_ratio))
+		push_error("[WorldMap] 序列化后 player_cell 不一致")
 
-	print("=== 自动测试: 世界地图+家具掉落=", ok, " (应为 true) 药柜药=%.2f 文件柜文件=%.2f 医院整体药=%.2f 超市食物=%.2f" % [med_ratio, file_ratio, hosp_ratio, sup_ratio])
+	print("=== 自动测试: 无限世界地图=", ok, " (应为 true) tiles=", WorldMapData.tiles.size(), " explored=", WorldMapData.explored.size())

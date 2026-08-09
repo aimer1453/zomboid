@@ -40,6 +40,8 @@ var _floor_label: Label = null      # 楼层 HUD 文字
 var _floor_hud: CanvasLayer = null  # 楼层 HUD (屏幕固定, 不随相机移动)
 var _floor_switch_guard: int = 0    # 换层后短暂锁, 防同帧重复触发死循环
 var _suppress_stairs: bool = false  # 自动测试期间抑制楼梯触发, 避免脚本移动误换层
+var _exit_armed: bool = false      # 出口触发守卫: 玩家离开出口格后才允许"走到出口回主地图"
+                                 # (出入口同格时, 出生即在出口, 必须走开再回来才触发, 否则一进场就弹回)
 
 ## 建筑类型 → 敌人权重 [普通, 疾速, 喷射, 坦克]
 const ENEMY_WEIGHTS := {
@@ -195,6 +197,7 @@ func is_cell_walkable(cell_center: Vector2) -> bool:
 func _create_player() -> void:
 	_player = PF.spawn(self, _world_pos(_generator.entrance), tile_size)
 	_player.world = self
+	_exit_armed = false  # 出入口同格时出生即在出口, 必须走开后才允许触发出口
 
 
 # --- 敌人 + 战利品 / 家具 ---
@@ -246,6 +249,7 @@ func change_floor(target_floor: int, arrival_cell: Vector2i) -> void:
 		dest = _nudge_off_stairs(arrival_cell)
 	_player.global_position = _world_pos(dest)
 	_player.is_moving = false
+	_exit_armed = false  # 换层落地后须重新走开出口才能触发返回 (防出入口同格一落地就弹回)
 	_floor_switch_guard = 15  # 约 0.25s 内不重复触发, 双重防死循环
 	_refresh_move_grid()
 	_spawn_floor_entities(target_floor)
@@ -590,10 +594,15 @@ func _process(_delta: float) -> void:
 	if _floor_switch_guard > 0:
 		_floor_switch_guard -= 1
 	if _player and not TurnManager.combat_mode and not _suppress_stairs and _floor_switch_guard <= 0:
-		# 0 楼走到院门 → 回世界地图 (外面)
-		if _current_floor == 0 and _player.global_position.distance_to(_exit_pos) < tile_size * 0.6:
-			exit_dungeon()
-			return
+		# 0 楼走到院门 → 回世界地图 (外面); 出口守卫: 玩家须先离开出口格再回来才触发
+		if _current_floor == 0:
+			var near_exit: bool = _player.global_position.distance_to(_exit_pos) < tile_size * 0.6
+			if near_exit:
+				if _exit_armed:
+					exit_dungeon()
+					return
+			else:
+				_exit_armed = true  # 已离开出口 → 下次踩上即触发
 		# 楼梯换层: 走到上/下楼梯格即切层
 		var pc := _cell_of(_player.global_position)
 		if _floor_up_cell[_current_floor] != null and pc == _floor_up_cell[_current_floor]:
