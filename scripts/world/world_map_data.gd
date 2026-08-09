@@ -18,6 +18,9 @@ var seed_val: int = 1337
 ## 扁平数组: GRID*GRID 个 TerrainType
 var cells: Array = []
 var home_cell: Vector2i = Vector2i.ZERO
+## 上次进入副本的主地图格 (返回时标记"你从这里回来", 实现进出口对称: 从哪进从哪出)
+var last_entry_cell: Vector2i = Vector2i.ZERO
+var has_last_entry: bool = false
 ## 已探索 (idx -> true), 主地图格踩过/进过才亮
 var explored: Dictionary = {}
 
@@ -163,6 +166,8 @@ func location_seed(x: int, y: int) -> int:
 
 ## 点格进入: HOME→家园, 其他→对应地形副本
 func enter_location(x: int, y: int) -> void:
+	last_entry_cell = Vector2i(x, y)
+	has_last_entry = true
 	var t: int = terrain_at(x, y)
 	mark_explored(x, y)
 	if t == TerrainType.HOME:
@@ -177,6 +182,8 @@ func enter_location(x: int, y: int) -> void:
 
 
 func enter_home() -> void:
+	last_entry_cell = home_cell
+	has_last_entry = true
 	get_tree().change_scene_to_file("res://scenes/home_base.tscn")
 
 

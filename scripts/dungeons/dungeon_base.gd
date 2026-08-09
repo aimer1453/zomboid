@@ -135,6 +135,8 @@ func draw_current_floor() -> void:
 				_tilemap.set_cell(Vector2i(x, y), 0, Vector2i(TSB.Tiles.EXIT, 0))
 				if _current_floor == 0:
 					_exit_pos = _world_pos(Vector2i(x, y))
+					# 可见出口: 在 0 楼出口格上方贴"出口"浮标, 让玩家能找到回去的路
+					_add_tile_label(Vector2i(x, y), "出口", Color(0.45, 1.0, 0.55))
 			else:
 				_tilemap.set_cell(Vector2i(x, y), 0, Vector2i(TSB.Tiles.FLOOR, 0))
 	# 楼梯 (仅当前层可见)

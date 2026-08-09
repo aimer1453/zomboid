@@ -190,9 +190,10 @@ func enter_combat() -> void:
 	if not was_combat:
 		if _player_unit and is_instance_valid(_player_unit):
 			_set_unit_ap(_player_unit, _unit_ap_max(_player_unit))
-		# 仅给"已卷入"的丧尸回满 AP; 范围外丧尸保持低 AP, 不会行动
+		# 给所有丧尸回满 AP: 未卷入者虽本回合冻结待命 (take_turn 早返回),
+		# 但保持 AP 以便走入 detection_range 后能即时卷入并行动 (战斗中动态拉怪/脱战)
 		for unit: Node in _units:
-			if unit != _player_unit and is_instance_valid(unit) and unit.has_method("is_engaged") and unit.is_engaged():
+			if unit != _player_unit and is_instance_valid(unit) and unit.has_method("is_engaged"):
 				_set_unit_ap(unit, _unit_ap_max(unit))
 		combat_started.emit()
 	_check_player_turn()
@@ -384,8 +385,8 @@ func _start_new_round() -> void:
 	for unit: Node in _units:
 		if unit == _player_unit:
 			_set_unit_ap(unit, _unit_ap_max(unit))
-		elif unit.has_method("is_engaged") and unit.is_engaged():
-			# 仅给卷入战斗的丧尸回满 AP; 范围外未卷入者不回 (保持不行动)
+		elif unit.has_method("is_engaged"):
+			# 给所有丧尸回满 AP (未卷入者靠 take_turn 早返回冻结, 但保持 AP 可即时拉入)
 			_set_unit_ap(unit, _unit_ap_max(unit))
 
 	if WorldTime:

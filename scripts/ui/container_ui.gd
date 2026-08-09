@@ -207,6 +207,13 @@ func _make_item_cell(info: Dictionary) -> Control:
 	cell_style.border_color = rarity_color
 	cell_style.set_border_width_all(2)
 	cell_style.set_corner_radius_all(6)
+	# 废料档: 更薄更暗的低级框 (与背包格同一套显示规则)
+	var is_trash: bool = DataManager != null and rarity == DataManager.Rarity.TRASH
+	if is_trash:
+		cell_style.set_border_width_all(1)
+		cell_style.set_corner_radius_all(3)
+		cell_style.bg_color = Color(0.13, 0.13, 0.16, 0.9)
+	btn.add_theme_font_size_override("font_size", 10)
 	btn.add_theme_stylebox_override("normal", cell_style)
 	btn.add_theme_stylebox_override("hover", cell_style)
 	btn.add_theme_stylebox_override("pressed", cell_style)
@@ -215,6 +222,8 @@ func _make_item_cell(info: Dictionary) -> Control:
 	btn.text = "%s" % name
 	if name.length() > 5:
 		btn.text = name.substr(0, 5) + "…"
+	if is_trash:
+		btn.text += "·废料"
 
 	# 左键点击 → 弹操作菜单 (与点击丧尸弹动作菜单同一模式)
 	btn.pressed.connect(_on_cell_pressed.bind(item_id, btn))

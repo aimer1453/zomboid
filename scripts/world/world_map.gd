@@ -113,6 +113,16 @@ func _build_cell(x: int, y: int) -> void:
 		star.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_cell_layer.add_child(star)
 
+	# 进出口对称: 返回主地图时, 在"上次进入副本的格"上标"你在这里(出口)"
+	if WorldMapData.has_last_entry and Vector2i(x, y) == WorldMapData.last_entry_cell:
+		var here := Label.new()
+		here.text = "◆你在这里"
+		here.add_theme_font_size_override("font_size", 13)
+		here.position = rect.position + Vector2(2, cell_size - 18)
+		here.add_theme_color_override("font_color", Color(0.6, 1.0, 0.7))
+		here.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_cell_layer.add_child(here)
+
 
 func _on_home_pressed() -> void:
 	WorldMapData.enter_home()

@@ -9,8 +9,9 @@ const SAVE_DIR := "user://saves/"
 ## 物品类型 (装备类: 武器/防具/背包/饰品; 其他: 消耗品/材料/弹药/蓝图/任务道具)
 enum ItemType { CONSUMABLE, WEAPON, ARMOR, MATERIAL, KEY_ITEM, AMMO, BLUEPRINT, BACKPACK, TRINKET }
 
-## 稀有度 (决定掉落边框颜色: 普通灰 / 优秀绿 / 稀有蓝 / 史诗紫 / 传说金)
-enum Rarity { COMMON, UNCOMMON, RARE, EPIC, LEGENDARY }
+## 稀有度 (决定掉落边框颜色: 废料暗灰 / 普通灰 / 优秀绿 / 稀有蓝 / 史诗紫 / 传说金)
+## TRASH 放在末尾, 不动已有档位序号 (RARITY_COLORS/NAMES 用命名键, 加在末尾安全)
+enum Rarity { COMMON, UNCOMMON, RARE, EPIC, LEGENDARY, TRASH }
 
 ## 稀有度 → 边框颜色 (UI 统一从这里取, 禁止散落定义)
 const RARITY_COLORS := {
@@ -19,6 +20,7 @@ const RARITY_COLORS := {
 	Rarity.RARE: Color(0.35, 0.6, 0.95),
 	Rarity.EPIC: Color(0.75, 0.45, 0.95),
 	Rarity.LEGENDARY: Color(0.95, 0.75, 0.25),
+	Rarity.TRASH: Color(0.32, 0.32, 0.36),  # 废料: 暗灰, 明显低于普通档
 }
 
 ## 稀有度中文名
@@ -28,6 +30,7 @@ const RARITY_NAMES := {
 	Rarity.RARE: "稀有",
 	Rarity.EPIC: "史诗",
 	Rarity.LEGENDARY: "传说",
+	Rarity.TRASH: "废料",
 }
 
 ## 装备槽位 (equip_slot 用): 武器 / 防具 / 背包 / 饰品
@@ -132,7 +135,7 @@ func _register_default_items() -> void:
 	_add_item(ItemData.new("chocolate", "巧克力", ItemType.CONSUMABLE, "甜食, 大幅提升心情",
 		Vector2i(1,1), 10, "", {"food": 10, "morale": 20}, Rarity.UNCOMMON, 0.2))
 	_add_item(ItemData.new("water_polluted", "污染水", ItemType.MATERIAL, "雨水收集的异变之水",
-		Vector2i(1,1), 30, "", {}, Rarity.COMMON, 1.0))  # 1L ≈ 1kg
+		Vector2i(1,1), 30, "", {}, Rarity.TRASH, 1.0))  # 1L ≈ 1kg
 	# 肾上腺素: 快速回复精力 (AP+睡眠合并), 战斗应急用
 	_add_item(ItemData.new("adrenaline", "肾上腺素", ItemType.CONSUMABLE, "快速回复精力, 战斗应急",
 		Vector2i(1,1), 5, "", {"energy_restore": 40}, Rarity.UNCOMMON))
@@ -171,11 +174,11 @@ func _register_default_items() -> void:
 
 	# 护甲 (durability=耐久, 被击中磨损; 磨损后防御按比例衰减)
 	_add_item(ItemData.new("torn_clothes", "破旧衣衫", ItemType.ARMOR, "丧尸身上扒下来的破布衣服, 几乎没防护",
-		Vector2i(1,1), 1, "", {"defense": 1, "durability": 15}, Rarity.COMMON))
+		Vector2i(1,1), 1, "", {"defense": 1, "durability": 15}, Rarity.TRASH))
 	_add_item(ItemData.new("torn_pants", "破旧长裤", ItemType.ARMOR, "磨损严重的长裤, 聊胜于无",
-		Vector2i(1,1), 1, "", {"defense": 1, "durability": 15}, Rarity.COMMON))
+		Vector2i(1,1), 1, "", {"defense": 1, "durability": 15}, Rarity.TRASH))
 	_add_item(ItemData.new("dirty_shoes", "脏旧鞋子", ItemType.ARMOR, "沾满污渍的旧鞋, 勉强能穿",
-		Vector2i(1,1), 1, "", {"defense": 1, "durability": 15}, Rarity.COMMON))
+		Vector2i(1,1), 1, "", {"defense": 1, "durability": 15}, Rarity.TRASH))
 	_add_item(ItemData.new("leather_vest", "皮背心", ItemType.ARMOR, "基础防护",
 		Vector2i(2,2), 1, "", {"defense": 5, "durability": 30}, Rarity.UNCOMMON))
 	_add_item(ItemData.new("kevlar", "防弹衣", ItemType.ARMOR, "军用级防护",
@@ -211,7 +214,7 @@ func _register_default_items() -> void:
 	_add_item(ItemData.new("crystal_huge", "大能量晶石", ItemType.KEY_ITEM, "Boss掉落",
 		Vector2i(1,1), 10, "", {"crystal_value": 60}, Rarity.LEGENDARY))
 	_add_item(ItemData.new("zombie_flesh", "丧尸血肉", ItemType.MATERIAL, "搜刮尸体获得, 制作/出售材料",
-		Vector2i(1,1), 30))
+		Vector2i(1,1), 30, "", {}, Rarity.TRASH))
 	_add_item(ItemData.new("wood", "木材", ItemType.MATERIAL, "基础建材, 升级家具/制作使用",
 		Vector2i(1,1), 50, "", {}, Rarity.COMMON))
 	_add_item(ItemData.new("cloth", "布料", ItemType.MATERIAL, "缝纫材料, 升级软家具使用",

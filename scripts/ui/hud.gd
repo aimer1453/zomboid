@@ -75,6 +75,12 @@ class InvSlot extends PanelContainer:
 			var rarity_color: Color = DataManager.RARITY_COLORS.get(rarity, Color(0.62, 0.62, 0.62)) if DataManager else Color(0.62, 0.62, 0.62)
 			cell_style.border_color = rarity_color
 			cell_style.set_border_width_all(2)
+			var is_trash: bool = DataManager != null and rarity == DataManager.Rarity.TRASH
+			if is_trash:
+				# 废料档: 更薄更暗的低级框 + 更平的背景, 视觉上明显"低人一等"
+				cell_style.set_border_width_all(1)
+				cell_style.set_corner_radius_all(3)
+				cell_style.bg_color = Color(0.13, 0.13, 0.16, 0.9)
 
 			# 消耗品提示: 右键可直接食用
 			var item := DataManager.get_item(item_id)
@@ -94,7 +100,7 @@ class InvSlot extends PanelContainer:
 					var icon_rect := TextureRect.new()
 					icon_rect.texture = icon_tex
 					icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-					icon_rect.custom_minimum_size = Vector2(34, 34)
+					icon_rect.custom_minimum_size = Vector2(26 if is_trash else 34, 26 if is_trash else 34)
 					icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 					icon_rect.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 					vbox.add_child(icon_rect)
@@ -102,7 +108,7 @@ class InvSlot extends PanelContainer:
 			var name_l := Label.new()
 			name_l.text = info.get("name", item_id)
 			name_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			name_l.add_theme_font_size_override("font_size", 11)
+			name_l.add_theme_font_size_override("font_size", 10 if is_trash else 11)
 			vbox.add_child(name_l)
 
 			var count_l := Label.new()
@@ -110,6 +116,15 @@ class InvSlot extends PanelContainer:
 			count_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			count_l.add_theme_font_size_override("font_size", 12)
 			vbox.add_child(count_l)
+
+			# 废料档: 加一个小角标, 与边框一起凸显"低档"
+			if is_trash:
+				var tag_l := Label.new()
+				tag_l.text = "废料"
+				tag_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				tag_l.add_theme_font_size_override("font_size", 9)
+				tag_l.add_theme_color_override("font_color", Color(0.7, 0.7, 0.75))
+				vbox.add_child(tag_l)
 
 			add_child(vbox)
 			var rarity_name: String = DataManager.RARITY_NAMES.get(int(info.get("rarity", 0)), "普通") if DataManager else "普通"

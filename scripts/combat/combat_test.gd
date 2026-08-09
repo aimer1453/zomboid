@@ -143,6 +143,7 @@ func _run_auto_test() -> void:
 	_test_click_world_roundtrip()
 	_test_low_hp_enemy_selectable()
 	_test_player_floor_menu()
+	_test_combat_pull_in_on_proximity()
 	_test_combat_blocks_floor_menu()
 	# Issue B 距离限制回归 (全同步, 放最前保证 headless 帧信号不稳时也能跑到)
 	_test_corpse_loot_proximity()
@@ -231,6 +232,51 @@ func _test_combat_blocks_floor_menu() -> void:
 	_action_menu.hide_menu()
 	TurnManager.exit_combat(true)
 	print("=== 自动测试: 战斗中点主角地板不弹坐下/锻炼菜单=", ok, " (应为 true)")
+
+
+## 战斗中动态拉怪/脱战回归 (用户需求: 战斗中未卷入的丧尸, 玩家走近距离<触发距离→拉入; 走远>距离→脱离)
+func _test_combat_pull_in_on_proximity() -> void:
+	var ok := true
+	var player_home: Vector2 = _player.global_position
+	var z_script := load("res://scripts/units/enemies/zombie_basic.gd")
+	# 远处丧尸放 (13,8): 欧氏距玩家(3,3)=~11.2 格 > AGGRO_RADIUS(10); y=8 整行无墙, 视线无遮挡
+	var far_cell := Vector2i(13, 8)
+	var z: Node = EF.spawn(self, z_script, _world_pos(far_cell), tile_size, 100.0)
+	z.world = self
+	await get_tree().process_frame
+	if not is_instance_valid(z):
+		push_error("[PullIn] 远处丧尸生成失败")
+		print("=== 自动测试: 战斗中动态拉怪/脱战=", false, " (应为 true)")
+		return
+	# 开局进入战斗: propagate_aggro 只卷入 10 格内, 远处丧尸应保持未卷入
+	TurnManager.enter_combat()
+	await get_tree().process_frame
+	if z.is_engaged():
+		ok = false
+		push_error("[PullIn] 远处丧尸不应在战斗开局就被卷入 (dist>10)")
+	# 玩家走入其 detection_range(5) 且同一空旷行 (无墙遮挡) → 应被拉入
+	_player.global_position = _world_pos(Vector2i(9, 8))
+	await get_tree().process_frame
+	z.take_turn()
+	await get_tree().process_frame
+	if not z.is_engaged():
+		ok = false
+		push_error("[PullIn] 玩家走入触发距离后远处丧尸应被拉入战斗 (实际未卷入)")
+	# 反向: 玩家走远 (>AGGRO 10 格) → 该丧尸应脱离战斗
+	_player.global_position = _world_pos(Vector2i(1, 8))
+	await get_tree().process_frame
+	z.take_turn()
+	await get_tree().process_frame
+	if z.is_engaged():
+		ok = false
+		push_error("[PullIn] 玩家走远后远处丧尸应脱离战斗 (实际仍卷入)")
+	TurnManager.exit_combat(true)
+	if TurnManager.has_method("unregister_unit"):
+		TurnManager.unregister_unit(z)
+	z.queue_free()
+	_player.global_position = player_home  # 还原, 避免影响后续用例
+	await get_tree().process_frame
+	print("=== 自动测试: 战斗中动态拉怪/脱战=", ok, " (应为 true)")
 
 
 ## 丧尸穿墙回归: 丧尸在墙边随机巡逻 N 步 → 永不越过墙 (用户反馈: 丧尸绕过墙行走)

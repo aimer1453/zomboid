@@ -210,12 +210,14 @@ func take_turn() -> void:
 		ai_state = AIState.DEAD
 		return
 
-	# 战斗中未卷入的丧尸 (范围外) 不行动, 原地待命, 不会乱走/抢戏
+	# 先评估威胁: 战斗中未卷入的丧尸若已走入 detection_range 且有视线 → 卷入并继续行动
+	_evaluate_threat()
+
+	# 战斗中仍未卷入 (范围外/无视线): 冻结待命, 不乱走不抢戏
 	if TurnManager.combat_mode and not _engaged:
 		_send_turn_report()
 		return
 
-	_evaluate_threat()
 	match ai_state:
 		AIState.ATTACK:
 			_perform_attack()

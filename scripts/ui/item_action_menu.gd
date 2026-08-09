@@ -19,7 +19,9 @@ var _selected_item_id: String = ""
 
 
 func _ready() -> void:
-	layer = 100
+	# 弹出操作菜单: 层级必须高于所有其它 UI 面板 (hud=60 / build_menu&ability_tree=70 / container_ui&action_menu=100),
+	# 否则作为 container_ui 子节点时会被同 layer 的容器面板盖在下面 (视觉上看不到但能点)
+	layer = 200
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
 	_panel = PanelContainer.new()
@@ -83,10 +85,15 @@ func show_at(screen_pos: Vector2, item_id: String, context: String, on_action: C
 
 	# 定位: 菜单显示在点击格子的上方 (用户反馈: 之前从格子下方展开, 像"在背包格子下面")
 	# 先放屏幕左上测量面板真实尺寸, 再按尺寸摆放
+	# 关键: 每次弹出前必须把上次锁定的 custom_minimum_size 清零,
+	# 否则第二次(按钮更少)时面板被上次的锁定值撑住 → 量出来还是旧高度 → 下方留一长段空白
+	_panel.custom_minimum_size = Vector2.ZERO
 	_panel.position = Vector2(-500, -500)
 	_panel.visible = true
 	await get_tree().process_frame
 	var panel_size: Vector2 = _panel.size
+	# 硬锁定面板尺寸 = 内容尺寸, 杜绝任何布局把菜单拉伸成"长空白"
+	_panel.custom_minimum_size = panel_size
 	var viewport_size := get_viewport().get_visible_rect().size
 	var pos := screen_pos + Vector2(0, -panel_size.y - 4)  # 紧贴格子上方
 	if pos.y < 4:
