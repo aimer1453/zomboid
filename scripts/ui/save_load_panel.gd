@@ -14,6 +14,7 @@ var _root: Control = null
 var _bg: ColorRect = null
 var _panel: PanelContainer = null
 var _slot_containers: Array[Control] = []  # 每槽的 UI 容器
+var _slot_refs: Array[Dictionary] = []      # 每槽的节点引用(detail/load_btn/del_btn), 避免刷新时递归查找失败
 
 
 func _ready() -> void:
@@ -92,6 +93,7 @@ func _build_panel() -> void:
 
 ## 构建单个槽位的 UI 行
 func _build_slot_row(slot_idx: int) -> Control:
+	var refs := {"detail": null, "load_btn": null, "del_btn": null}
 	var row := PanelContainer.new()
 	var row_sb := StyleBoxFlat.new()
 	row_sb.bg_color = Color(0.18, 0.19, 0.22, 0.9)
@@ -123,6 +125,7 @@ func _build_slot_row(slot_idx: int) -> Control:
 	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info_vbox.add_child(detail)
+	refs["detail"] = detail
 
 	hbox.add_child(info_vbox)
 
@@ -144,6 +147,7 @@ func _build_slot_row(slot_idx: int) -> Control:
 	load_btn.add_theme_font_size_override("font_size", 13)
 	load_btn.pressed.connect(_on_load.bind(slot_idx))
 	btn_hbox.add_child(load_btn)
+	refs["load_btn"] = load_btn
 
 	var del_btn := Button.new()
 	del_btn.name = "del_btn"
@@ -152,19 +156,21 @@ func _build_slot_row(slot_idx: int) -> Control:
 	del_btn.add_theme_font_size_override("font_size", 13)
 	del_btn.pressed.connect(_on_delete.bind(slot_idx))
 	btn_hbox.add_child(del_btn)
+	refs["del_btn"] = del_btn
 
 	hbox.add_child(btn_hbox)
 	row.add_child(hbox)
+	_slot_refs.append(refs)
 	return row
 
 
 ## 刷新所有槽位显示 (打开时调用)
 func _refresh_slots() -> void:
 	for slot_idx in range(SLOT_COUNT):
-		var container: Control = _slot_containers[slot_idx]
-		var detail: Label = container.get_node_or_null("detail_label")
-		var load_btn: Button = container.get_node_or_null("load_btn")
-		var del_btn: Button = container.get_node_or_null("del_btn")
+		var refs: Dictionary = _slot_refs[slot_idx]
+		var detail: Label = refs.get("detail")
+		var load_btn: Button = refs.get("load_btn")
+		var del_btn: Button = refs.get("del_btn")
 
 		if DataManager.save_exists(slot_idx):
 			var data: Dictionary = DataManager.load_from_slot(slot_idx)
@@ -172,22 +178,16 @@ func _refresh_slots() -> void:
 				var char_id: int = data.get("character", 0)
 				var char_name: String = GameManager.get_character_name(char_id) if GameManager else "未知"
 				detail.text = "角色: %s" % char_name
-				if load_btn:
-					load_btn.disabled = false
-				if del_btn:
-					del_btn.disabled = false
+				load_btn.disabled = false
+				del_btn.disabled = false
 			else:
 				detail.text = "— 数据损坏 —"
-				if load_btn:
-					load_btn.disabled = true
-				if del_btn:
-					del_btn.disabled = false
+				load_btn.disabled = true
+				del_btn.disabled = false
 		else:
 			detail.text = "— 空槽 —"
-			if load_btn:
-				load_btn.disabled = true
-			if del_btn:
-				del_btn.disabled = true
+			load_btn.disabled = true
+			del_btn.disabled = true
 
 
 func open() -> void:
