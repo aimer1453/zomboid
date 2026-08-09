@@ -16,6 +16,7 @@ var _panel: PanelContainer = null
 var _list: VBoxContainer = null
 var _callback: Callable = Callable()
 var _selected_item_id: String = ""
+var _measure_gen: int = 0  # 代际守卫: 防止两次 show_at 同帧重叠时旧协程用旧内容锁尺寸
 
 
 func _ready() -> void:
@@ -53,8 +54,11 @@ func show_at(screen_pos: Vector2, item_id: String, context: String, on_action: C
 	_selected_item_id = item_id
 	_callback = on_action
 
+	# 同步清掉旧按钮 (不能 queue_free 延迟释放: 量尺寸时旧按钮可能还在,
+	# 导致第二次弹出的面板把上一次按钮也算进去 → 列表叠加变长)
 	for child in _list.get_children():
-		child.queue_free()
+		_list.remove_child(child)
+		child.free()
 
 	var actions := get_actions_for(item_id, context)
 	if actions.is_empty():
@@ -90,7 +94,15 @@ func show_at(screen_pos: Vector2, item_id: String, context: String, on_action: C
 	_panel.custom_minimum_size = Vector2.ZERO
 	_panel.position = Vector2(-500, -500)
 	_panel.visible = true
+
+	# 代际守卫: show_at 被 pressed 信号直接调用(未 await), 两次弹窗可能同帧重叠。
+	# 用递增代号标记本次调用, await 回来后若已被更新的调用覆盖则放弃本次测量,
+	# 避免旧协程用旧内容(或叠加内容)把 custom_minimum_size 锁成错误的大尺寸。
+	var gen: int = _measure_gen + 1
+	_measure_gen = gen
 	await get_tree().process_frame
+	if gen != _measure_gen:
+		return
 	var panel_size: Vector2 = _panel.size
 	# 硬锁定面板尺寸 = 内容尺寸, 杜绝任何布局把菜单拉伸成"长空白"
 	_panel.custom_minimum_size = panel_size
