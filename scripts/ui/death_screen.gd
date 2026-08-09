@@ -107,5 +107,10 @@ func _on_restart() -> void:
 
 
 func _on_load() -> void:
-	if GameManager and GameManager.has_method("load_from_death"):
+	# 打开存档读档面板选槽 (面板内部会处理隐藏死亡屏 + 读档)
+	var slp := get_tree().current_scene.find_child("SaveLoadPanel", true, false) if get_tree() else null
+	if slp and slp.has_method("open"):
+		slp.open()
+	elif GameManager and GameManager.has_method("load_from_death"):
+		# 兜底: 面板不存在时走旧逻辑
 		GameManager.load_from_death()

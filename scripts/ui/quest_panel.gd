@@ -72,6 +72,7 @@ func _build_panel() -> void:
 	_bg_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_bg_label.add_theme_font_size_override("font_size", 13)
 	_bg_label.add_theme_color_override("font_color", Color(0.82, 0.84, 0.88))
+	_bg_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vbox.add_child(_bg_label)
 
 	var sep := HSeparator.new()
@@ -107,6 +108,7 @@ func _refresh() -> void:
 		var text := Label.new()
 		text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		text.add_theme_font_size_override("font_size", 14)
+		text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		if i < current:
 			mark.text = "✓"
 			mark.add_theme_color_override("font_color", Color(0.5, 0.9, 0.5))

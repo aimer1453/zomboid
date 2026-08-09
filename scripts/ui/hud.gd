@@ -224,7 +224,6 @@ class EquipSlot extends PanelContainer:
 # --- 主 HUD ---
 
 var _backpack_btn: Button = null
-var _load_btn: Button = null
 var _root: Control = null
 var _bg: ColorRect = null
 var _panel: PanelContainer = null
@@ -593,21 +592,11 @@ func _build_button() -> void:
 	bar.add_child(ability_btn)
 
 	var save_btn := Button.new()
-	save_btn.text = "存档"
+	save_btn.text = "存档读档"
 	save_btn.custom_minimum_size = Vector2(94, 88)
-	save_btn.add_theme_font_size_override("font_size", 20)
-	save_btn.pressed.connect(_on_save_pressed)
+	save_btn.add_theme_font_size_override("font_size", 18)
+	save_btn.pressed.connect(_on_save_load_pressed)
 	bar.add_child(save_btn)
-
-	_load_btn = Button.new()
-	_load_btn.text = "读档"
-	_load_btn.custom_minimum_size = Vector2(94, 88)
-	_load_btn.add_theme_font_size_override("font_size", 20)
-	_load_btn.pressed.connect(_on_load_pressed)
-	# 无存档时禁用 (有档才能读)
-	if GameManager:
-		_load_btn.disabled = not GameManager.has_save()
-	bar.add_child(_load_btn)
 
 	# 任务按钮 (打开当前角色主线任务面板)
 	var quest_btn := Button.new()
@@ -618,21 +607,12 @@ func _build_button() -> void:
 	bar.add_child(quest_btn)
 
 
-## 存档: 硬核单槽保存 (P0)
-func _on_save_pressed() -> void:
-	if GameManager:
-		GameManager.save_game()
-		# 存档成功后, 读档按钮可用
-		if _load_btn:
-			_load_btn.disabled = not GameManager.has_save()
-	if _log_panel:
-		_log_panel.append_text("[存档成功]\n")
-
-
-## 读档: 加载最后一次存档 (场景切到 world_map, 由 game_scene_base 应用主角数据)
-func _on_load_pressed() -> void:
-	if GameManager and GameManager.has_save():
-		GameManager.load_game()
+## 存档/读档: 打开统一多槽位管理面板
+func _on_save_load_pressed() -> void:
+	var root := get_tree().current_scene
+	var slp := root.find_child("SaveLoadPanel", true, false) if root else null
+	if slp and slp.has_method("open"):
+		slp.open()
 
 
 ## 底部"异能"按钮: 切换异能树面板 (从场景树找 ATU)

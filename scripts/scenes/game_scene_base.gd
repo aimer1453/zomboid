@@ -26,6 +26,7 @@ const CA := preload("res://scripts/combat/combat_actions.gd")
 const HUDG := preload("res://scripts/ui/hud.gd")
 const ATU := preload("res://scripts/ui/ability_tree_ui.gd")
 const QP := preload("res://scripts/ui/quest_panel.gd")
+const SLP := preload("res://scripts/ui/save_load_panel.gd")
 const CIU := preload("res://scripts/ui/container_ui.gd")
 const GI := preload("res://scripts/tiles/ground_item.gd")
 const CP := preload("res://scripts/tiles/corpse.gd")
@@ -453,6 +454,10 @@ func _create_ability_ui() -> void:
 	var quest_ui: Node = QP.new()
 	quest_ui.name = "QuestPanel"
 	add_child(quest_ui)
+	# 存档读档面板 (由 HUD "存档读档" 按钮打开, 多槽位管理)
+	var slp_ui: Node = SLP.new()
+	slp_ui.name = "SaveLoadPanel"
+	add_child(slp_ui)
 
 
 # --- 战斗信号 ---
