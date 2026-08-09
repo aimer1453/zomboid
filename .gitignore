@@ -1,0 +1,17 @@
+# Godot 缓存与构建产物
+.godot/
+.godot_bak2/
+.godot_bak3/
+dotgodot_stale/
+logs/
+run.log
+home_test.log
+wtest_root.txt
+
+# 个人/工具记忆（不应入库）
+.workbuddy/
+
+# 系统文件
+Thumbs.db
+ehthumbs.db
+Desktop.ini

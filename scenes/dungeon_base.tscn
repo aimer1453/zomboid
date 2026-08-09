@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3 uid="uid://dungeon_0001"]
+
+[ext_resource type="Script" path="res://scripts/dungeons/dungeon_base.gd" id="1_dungeon"]
+
+[node name="DungeonBase" type="Node2D"]
+script = ExtResource("1_dungeon")
+building_type = 0

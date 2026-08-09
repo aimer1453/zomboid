@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://homebase_0001"]
+
+[ext_resource type="Script" path="res://scripts/home_base.gd" id="1_homebase"]
+
+[node name="HomeBase" type="Node2D"]
+script = ExtResource("1_homebase")

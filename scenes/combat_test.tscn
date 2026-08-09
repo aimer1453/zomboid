@@ -1,0 +1,13 @@
+[gd_scene load_steps=3 format=3 uid="uid://combat_test_0001"]
+
+[ext_resource type="Script" path="res://scripts/combat/combat_test.gd" id="1_test"]
+[ext_resource type="Script" path="res://scripts/combat/combat_state_machine.gd" id="2_csm"]
+
+[node name="CombatTest" type="Node2D"]
+script = ExtResource("1_test")
+tile_size = 64
+spawn_radius = 8
+test_enemies = 2
+
+[node name="CombatStateMachine" type="Node" parent="."]
+script = ExtResource("2_csm")

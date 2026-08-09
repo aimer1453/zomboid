@@ -1,0 +1,4 @@
+OneDriveUserFolder=C:\Users\aimer1453\OneDrive
+Desktop=D:\Users\17939\Desktop
+Personal=C:\Users\aimer1453\Documents
+ProjectPath=E:\Godot\Project\zomboid
