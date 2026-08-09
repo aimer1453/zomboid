@@ -157,29 +157,23 @@ func mark_explored(x: int, y: int) -> void:
 	explored[_key(x, y)] = true
 
 
-## 标记 (x,y) 自身 + 8 邻居为已探索并生成其地形 (到某地即开一圈图)
+## 标记 (x,y) 自身 + 4 邻(上下左右)为已探索并生成其地形。
+## 菱形/十字探索(非九宫格): 只揭示正上下左右, 斜角不揭示 → 地图按 4 方向一格推进。
 func reveal_neighbors(x: int, y: int) -> void:
 	mark_explored(x, y)
 	ensure_tile(x, y)
-	for dy in range(-1, 2):
-		for dx in range(-1, 2):
-			if dx == 0 and dy == 0:
-				continue
-			ensure_tile(x + dx, y + dy)
-			mark_explored(x + dx, y + dy)
+	var dirs: Array = [[1, 0], [-1, 0], [0, 1], [0, -1]]
+	for d in dirs:
+		var dx: int = int(d[0])
+		var dy: int = int(d[1])
+		ensure_tile(x + dx, y + dy)
+		mark_explored(x + dx, y + dy)
 
 
-## 是否已在地图上"显示": 自身已探索, 或 8 邻居任一已探索
+## 是否已在地图上"显示": 自身已探索即可。
+## (探索按 4 方向菱形推进, 不再用 8 邻居推断 → 斜角格不会被揭示, 杜绝九宫格)
 func is_revealed(x: int, y: int) -> bool:
-	if is_explored(x, y):
-		return true
-	for dy in range(-1, 2):
-		for dx in range(-1, 2):
-			if dx == 0 and dy == 0:
-				continue
-			if is_explored(x + dx, y + dy):
-				return true
-	return false
+	return is_explored(x, y)
 
 
 ## 主角移动到世界格: 记录位置 + 生成该格与 8 邻居(视野扩展)

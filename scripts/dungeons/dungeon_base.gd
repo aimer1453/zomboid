@@ -25,7 +25,6 @@ var dungeon_width: int = 36
 var dungeon_height: int = 26
 
 var _generator: RefCounted = null
-var _exit_pos: Vector2 = Vector2.ZERO
 var _furniture_list: Array = []
 
 # --- 多层建筑 (楼梯换层) ---
@@ -136,7 +135,6 @@ func draw_current_floor() -> void:
 			elif cell_type == 2:
 				_tilemap.set_cell(Vector2i(x, y), 0, Vector2i(TSB.Tiles.EXIT, 0))
 				if _current_floor == 0:
-					_exit_pos = _world_pos(Vector2i(x, y))
 					# 入口即出口: 在 0 楼出入口格上方贴"出口"浮标, 提醒玩家从这里离开
 					_add_tile_label(Vector2i(x, y), "出口", Color(0.45, 1.0, 0.55))
 			else:
@@ -593,18 +591,16 @@ func _process(_delta: float) -> void:
 	super._process(_delta)  # 父类: 鼠标悬停地块高亮
 	if _floor_switch_guard > 0:
 		_floor_switch_guard -= 1
-	if _player and not TurnManager.combat_mode and not _suppress_stairs and _floor_switch_guard <= 0:
-		# 0 楼走到院门 → 回世界地图 (外面); 出口守卫: 玩家须先离开出口格再回来才触发
-		if _current_floor == 0:
-			var near_exit: bool = _player.global_position.distance_to(_exit_pos) < tile_size * 0.6
-			if near_exit:
-				if _exit_armed:
-					exit_dungeon()
-					return
-			else:
-				_exit_armed = true  # 已离开出口 → 下次踩上即触发
-		# 楼梯换层: 走到上/下楼梯格即切层
+	if _player and not _suppress_stairs and _floor_switch_guard <= 0:
 		var pc := _cell_of(_player.global_position)
+		# 0 楼走到出口格(=入口) → 回世界地图。出生即在出口, 须先离开出口格再回来才触发(防一进场弹回)
+		if _current_floor == 0 and pc == _generator.exit_cell:
+			if _exit_armed:
+				exit_dungeon()
+				return
+		elif _current_floor == 0:
+			_exit_armed = true  # 已离开出口格 → 下次踩上即触发返回
+		# 楼梯换层: 走到上/下楼梯格即切层 (战斗中 change_floor 内部拦截)
 		if _floor_up_cell[_current_floor] != null and pc == _floor_up_cell[_current_floor]:
 			change_floor(_current_floor + 1, _floor_up_arrival[_current_floor])
 		elif _floor_down_cell[_current_floor] != null and pc == _floor_down_cell[_current_floor]:
@@ -675,10 +671,42 @@ func _test_floor_switch() -> void:
 	print("=== 自动测试: 楼层切换=", ok, " (应为 true) 当前=", _current_floor + 1, " 层")
 
 
+## 出口触发逻辑(纯判定, 不真正换场景): 出生在出口未武装→不触发; 离开→武装; 回出口且武装→触发
+func _test_exit_logic() -> void:
+	var ok := true
+	_exit_armed = false
+	_player.global_position = _world_pos(_generator.exit_cell)
+	var on_exit: bool = _cell_of(_player.global_position) == _generator.exit_cell
+	if not on_exit:
+		ok = false
+		push_error("[Exit] 玩家未出生在出口格")
+	if on_exit and _exit_armed:
+		ok = false
+		push_error("[Exit] 出生即武装(应为 false)")
+	# 离开出口格(4 方向任一格) → 武装
+	_player.global_position = _world_pos(_generator.exit_cell + Vector2i(1, 0))
+	if _cell_of(_player.global_position) != _generator.exit_cell:
+		_exit_armed = true
+	if not _exit_armed:
+		ok = false
+		push_error("[Exit] 离开出口后未武装")
+	# 回到出口格 且 已武装 → 应触发退出
+	_player.global_position = _world_pos(_generator.exit_cell)
+	var should_exit: bool = (_cell_of(_player.global_position) == _generator.exit_cell) and _exit_armed
+	if not should_exit:
+		ok = false
+		push_error("[Exit] 回到出口格且已武装却判定不退出")
+	# 恢复状态(测试期 _suppress_stairs=true, _process 不会真正换场景)
+	_exit_armed = false
+	_player.global_position = _world_pos(_generator.entrance)
+	print("=== 自动测试: 出口触发逻辑=", ok, " (应为 true) ===")
+
+
 func _run_auto_test() -> void:
 	await get_tree().create_timer(0.6).timeout
 	_suppress_stairs = true   # 脚本化移动期间抑制楼梯触发, 避免误换层
 	_test_floor_switch()
+	_test_exit_logic()
 	print("=== 自动测试: 探索连续移动 x3 ===")
 	var start := _player.global_position
 	_player.move_to_cell(start + Vector2(tile_size * 2, 0))

@@ -175,8 +175,8 @@ func _on_cell_clicked(gx: int, gy: int) -> void:
 	var target := pc + Vector2i(gx, gy)
 	if target == pc:
 		return
-	# 仅允许走到相邻(8 向)已揭示格
-	if abs(target.x - pc.x) > 1 or abs(target.y - pc.y) > 1:
+	# 仅允许走到相邻(上下左右 4 向)已揭示格; 斜向(曼哈顿距离≠1)不允许
+	if abs(target.x - pc.x) + abs(target.y - pc.y) != 1:
 		return
 	if not WorldMapData.is_revealed(target.x, target.y):
 		return
@@ -213,6 +213,15 @@ func _run_auto_test() -> void:
 	if WorldMapData.is_revealed(hx + 5, hy):
 		ok = false
 		push_error("[WorldMap] 远处 (hx+5) 不应可见")
+	# 初始应只揭示 5 格(家 + 上下左右, 菱形十字), 而非九宫格 9 格
+	var init_n := 0
+	for yy in range(-2, 3):
+		for xx in range(-2, 3):
+			if WorldMapData.is_revealed(hx + xx, hy + yy):
+				init_n += 1
+	if init_n != 5:
+		ok = false
+		push_error("[WorldMap] 初始应只揭示家+上下左右共 5 格(菱形), 实际=", init_n)
 	if WorldMapData.terrain_at(hx, hy) != WorldMapData.TerrainType.HOME:
 		ok = false
 		push_error("[WorldMap] home 格不是 HOME")
