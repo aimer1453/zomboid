@@ -25,6 +25,7 @@ const AM := preload("res://scripts/ui/action_menu.gd")
 const CA := preload("res://scripts/combat/combat_actions.gd")
 const HUDG := preload("res://scripts/ui/hud.gd")
 const ATU := preload("res://scripts/ui/ability_tree_ui.gd")
+const QP := preload("res://scripts/ui/quest_panel.gd")
 const CIU := preload("res://scripts/ui/container_ui.gd")
 const GI := preload("res://scripts/tiles/ground_item.gd")
 const CP := preload("res://scripts/tiles/corpse.gd")
@@ -448,6 +449,10 @@ func _create_ability_ui() -> void:
 	_ability_ui = ATU.new()
 	_ability_ui.name = "AbilityTreeUI"
 	add_child(_ability_ui)
+	# 任务面板 (与异能树同级, 由 HUD "任务" 按钮切换)
+	var quest_ui: Node = QP.new()
+	quest_ui.name = "QuestPanel"
+	add_child(quest_ui)
 
 
 # --- 战斗信号 ---

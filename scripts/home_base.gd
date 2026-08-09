@@ -480,6 +480,9 @@ func _process(_delta: float) -> void:
 			GameManager.save_game()
 		# 走出院门即点亮世界地图 HOME 四周邻居 (开图不必先进副本)
 		WorldMapData.reveal_neighbors(WorldMapData.home_cell.x, WorldMapData.home_cell.y)
+		# 主线里程碑: 走出安全屋 (步骤 1)
+		if GameManager and GameManager.has_method("advance_story"):
+			GameManager.advance_story(1)
 		WorldMapData.call_deferred("return_to_world")
 
 

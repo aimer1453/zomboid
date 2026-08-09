@@ -76,6 +76,9 @@ func tick_round() -> void:
 
 func _on_new_day() -> void:
 	print("[WorldTime] 新的一天: Day ", day)
+	# 累计存活天数 (成就解锁 / 主线推进)
+	if GameManager and GameManager.has_method("record_day"):
+		GameManager.record_day()
 	_roll_weather()
 
 

@@ -453,5 +453,42 @@ func save_exists(slot: int) -> bool:
 	return FileAccess.file_exists(_get_save_path(slot))
 
 
+## 元存档: 已解锁角色 + 累计统计 (独立于游戏存档, 启动即读, 成就跨会话生效)
+const META_PATH := SAVE_DIR + "meta.json"
+
+
+func save_meta(data: Dictionary) -> void:
+	DirAccess.make_dir_recursive_absolute(SAVE_DIR)
+	var file := FileAccess.open(META_PATH, FileAccess.WRITE)
+	if not file:
+		return
+	file.store_string(JSON.stringify(data, "  "))
+	file.close()
+
+
+func load_meta() -> Dictionary:
+	if not FileAccess.file_exists(META_PATH):
+		return {}
+	var file := FileAccess.open(META_PATH, FileAccess.READ)
+	if not file:
+		return {}
+	var text := file.get_as_text()
+	file.close()
+	var parsed: Variant = JSON.parse_string(text)
+	if not (parsed is Dictionary):
+		return {}
+	# JSON 数字默认存为 float, 归一化为 int 便于与枚举值比较
+	var u: Array = parsed.get("unlocked", [])
+	var u_int: Array = []
+	for v in u:
+		u_int.append(int(v))
+	parsed["unlocked"] = u_int
+	var s: Dictionary = parsed.get("stats", {})
+	for k in s.keys():
+		s[k] = int(s[k])
+	parsed["stats"] = s
+	return parsed
+
+
 func _get_save_path(slot: int) -> String:
 	return SAVE_DIR + "save_" + str(slot) + ".json"

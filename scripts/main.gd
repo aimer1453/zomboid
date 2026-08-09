@@ -21,10 +21,8 @@ func _ready() -> void:
 
 
 func _boot_game() -> void:
-	if _has_saves():
-		_load_or_new_game()
-	else:
-		_start_new_game()
+	# 启动进入"开始游戏"界面 (选角色 / 继续游戏), 由界面决定新游戏或读档
+	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
 
 func _verify_autoloads() -> void:

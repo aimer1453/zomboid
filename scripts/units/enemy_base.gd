@@ -438,6 +438,9 @@ func _get_corpse_loot() -> Array:
 func _on_died() -> void:
 	ai_state = AIState.DEAD
 	enemy_died.emit(self)
+	# 累计击杀 (成就解锁 / 主线推进)
+	if GameManager and GameManager.has_method("record_kill"):
+		GameManager.record_kill()
 	_spawn_corpse()
 	queue_free()
 

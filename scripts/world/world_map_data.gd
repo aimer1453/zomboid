@@ -178,6 +178,9 @@ func enter_location(x: int, y: int) -> void:
 	GameManager.set_meta("pending_dungeon_seed", location_seed(x, y))
 	GameManager.set_meta("pending_dungeon_name", terrain_name(t))
 	GameManager.change_state(GameManager.GameState.EXPLORING)
+	# 主线里程碑: 探索一处副本 (步骤 2)
+	if GameManager and GameManager.has_method("advance_story"):
+		GameManager.advance_story(2)
 	get_tree().change_scene_to_file("res://scenes/dungeon_base.tscn")
 
 

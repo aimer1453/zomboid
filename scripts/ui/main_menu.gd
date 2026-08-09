@@ -1,0 +1,234 @@
+extends Control
+
+# ============================================================
+# MainMenu — 开始游戏界面: 选择角色 / 继续游戏
+# ============================================================
+# - 标题 + 继续游戏(有档时)
+# - 角色卡片网格: 已解锁可选, 锁定显示成就提示
+# - 选中角色展示背景故事 + 主线任务预览
+# - 开始游戏 → GameManager.start_new_game(selected)
+
+const CHAR_ORDER := [
+	GameManager.CharacterID.SPECIAL_FORCE,
+	GameManager.CharacterID.HUNTER,
+	GameManager.CharacterID.DOCTOR,
+	GameManager.CharacterID.ELECTRICIAN,
+	GameManager.CharacterID.PSYCHIC,
+]
+
+var _selected_id: int = GameManager.CharacterID.SPECIAL_FORCE
+var _cards: Dictionary = {}        # id -> Button(卡片)
+var _detail_title: Label = null
+var _detail_series: Label = null
+var _detail_bg: Label = null
+var _detail_quest: VBoxContainer = null
+var _start_btn: Button = null
+
+
+func _ready() -> void:
+	_build_ui()
+
+
+func _build_ui() -> void:
+	# 暗色背景
+	var bg := ColorRect.new()
+	bg.color = Color(0.05, 0.06, 0.09, 1.0)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(bg)
+
+	# 居中列
+	var vbox := VBoxContainer.new()
+	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+	vbox.offset_left = 60
+	vbox.offset_right = -60
+	vbox.offset_top = 40
+	vbox.offset_bottom = -40
+	vbox.add_theme_constant_override("separation", 18)
+	add_child(vbox)
+
+	var title := Label.new()
+	title.text = "末 日 生 存"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 46)
+	title.add_theme_color_override("font_color", Color(0.9, 0.25, 0.2))
+	vbox.add_child(title)
+
+	var sub := Label.new()
+	sub.text = "选择你的幸存者"
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sub.add_theme_font_size_override("font_size", 20)
+	sub.add_theme_color_override("font_color", Color(0.7, 0.75, 0.8))
+	vbox.add_child(sub)
+
+	# 继续游戏 (有档时)
+	if GameManager.has_save():
+		var cont := Button.new()
+		cont.text = "继续游戏"
+		cont.custom_minimum_size = Vector2(240, 54)
+		cont.add_theme_font_size_override("font_size", 20)
+		cont.pressed.connect(_on_continue)
+		vbox.add_child(cont)
+
+	# 角色卡片行
+	var card_row := HBoxContainer.new()
+	card_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	card_row.add_theme_constant_override("separation", 14)
+	vbox.add_child(card_row)
+	for id in CHAR_ORDER:
+		var card := _make_card(id)
+		_cards[id] = card
+		card_row.add_child(card)
+
+	# 详情面板
+	var detail := PanelContainer.new()
+	var dsb := StyleBoxFlat.new()
+	dsb.bg_color = Color(0.1, 0.11, 0.15, 0.95)
+	dsb.border_color = Color(0.4, 0.4, 0.5)
+	dsb.set_border_width_all(2)
+	dsb.set_corner_radius_all(12)
+	dsb.content_margin_left = 22
+	dsb.content_margin_right = 22
+	dsb.content_margin_top = 16
+	dsb.content_margin_bottom = 16
+	detail.add_theme_stylebox_override("panel", dsb)
+	vbox.add_child(detail)
+
+	var dvbox := VBoxContainer.new()
+	dvbox.add_theme_constant_override("separation", 8)
+	detail.add_child(dvbox)
+
+	_detail_title = Label.new()
+	_detail_title.add_theme_font_size_override("font_size", 24)
+	dvbox.add_child(_detail_title)
+
+	_detail_series = Label.new()
+	_detail_series.add_theme_font_size_override("font_size", 15)
+	_detail_series.add_theme_color_override("font_color", Color(0.95, 0.8, 0.3))
+	dvbox.add_child(_detail_series)
+
+	_detail_bg = Label.new()
+	_detail_bg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_detail_bg.add_theme_font_size_override("font_size", 14)
+	_detail_bg.add_theme_color_override("font_color", Color(0.82, 0.84, 0.88))
+	dvbox.add_child(_detail_bg)
+
+	var qlabel := Label.new()
+	qlabel.text = "主线任务"
+	qlabel.add_theme_font_size_override("font_size", 16)
+	qlabel.add_theme_color_override("font_color", Color(0.6, 0.85, 0.7))
+	dvbox.add_child(qlabel)
+
+	_detail_quest = VBoxContainer.new()
+	_detail_quest.add_theme_constant_override("separation", 4)
+	dvbox.add_child(_detail_quest)
+
+	# 开始按钮
+	_start_btn = Button.new()
+	_start_btn.text = "开始游戏"
+	_start_btn.custom_minimum_size = Vector2(260, 60)
+	_start_btn.add_theme_font_size_override("font_size", 22)
+	_start_btn.pressed.connect(_on_start)
+	vbox.add_child(_start_btn)
+
+	# 默认选中第一个已解锁角色
+	_select(GameManager.CharacterID.SPECIAL_FORCE)
+
+
+func _make_card(id: int) -> Button:
+	var unlocked: bool = GameManager.is_character_unlocked(id)
+	var card := Button.new()
+	card.custom_minimum_size = Vector2(180, 220)
+	card.add_theme_font_size_override("font_size", 16)
+	card.pressed.connect(_select.bind(id))
+
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 8)
+
+	var name_l := Label.new()
+	name_l.text = GameManager.get_character_name(id)
+	name_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_l.add_theme_font_size_override("font_size", 22)
+	col.add_child(name_l)
+
+	var series_l := Label.new()
+	series_l.text = GameManager.get_character_series(id)
+	series_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	series_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	series_l.add_theme_font_size_override("font_size", 12)
+	series_l.add_theme_color_override("font_color", Color(0.95, 0.8, 0.3))
+	col.add_child(series_l)
+
+	if unlocked:
+		var tag := Label.new()
+		tag.text = "● 已解锁"
+		tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		tag.add_theme_font_size_override("font_size", 13)
+		tag.add_theme_color_override("font_color", Color(0.5, 0.9, 0.5))
+		col.add_child(tag)
+	else:
+		var lock := Label.new()
+		lock.text = "🔒 未解锁"
+		lock.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lock.add_theme_font_size_override("font_size", 13)
+		lock.add_theme_color_override("font_color", Color(0.7, 0.4, 0.4))
+		col.add_child(lock)
+		var hint := Label.new()
+		hint.text = GameManager.get_unlock_hint(id)
+		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		hint.add_theme_font_size_override("font_size", 11)
+		hint.add_theme_color_override("font_color", Color(0.6, 0.6, 0.68))
+		col.add_child(hint)
+
+	card.add_child(col)
+	return card
+
+
+func _select(id: int) -> void:
+	_selected_id = id
+	# 刷新卡片边框 (选中=亮边, 其他=暗边)
+	for cid in _cards.keys():
+		var card: Button = _cards[cid]
+		var sb := StyleBoxFlat.new()
+		sb.set_corner_radius_all(10)
+		sb.content_margin_left = 10
+		sb.content_margin_right = 10
+		sb.content_margin_top = 10
+		sb.content_margin_bottom = 10
+		if cid == _selected_id:
+			sb.bg_color = Color(0.16, 0.2, 0.28, 1.0)
+			sb.border_color = Color(0.95, 0.8, 0.3)
+			sb.set_border_width_all(3)
+		else:
+			sb.bg_color = Color(0.12, 0.13, 0.17, 1.0)
+			sb.border_color = Color(0.3, 0.3, 0.38)
+			sb.set_border_width_all(1)
+		card.add_theme_stylebox_override("normal", sb)
+	# 详情
+	var profile: Dictionary = GameManager.get_character_profile(id)
+	_detail_title.text = GameManager.get_character_name(id)
+	_detail_series.text = GameManager.get_character_series(id)
+	_detail_bg.text = GameManager.get_character_background(id)
+	# 主线步骤
+	for c in _detail_quest.get_children():
+		c.queue_free()
+	var steps: Array = GameManager.get_character_quest(id)
+	for i in steps.size():
+		var s := Label.new()
+		s.text = "%d. %s" % [i + 1, steps[i]]
+		s.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		s.add_theme_font_size_override("font_size", 13)
+		s.add_theme_color_override("font_color", Color(0.85, 0.87, 0.9))
+		_detail_quest.add_child(s)
+	# 开始按钮可用性
+	_start_btn.disabled = not GameManager.is_character_unlocked(id)
+
+
+func _on_continue() -> void:
+	GameManager.load_game()
+
+
+func _on_start() -> void:
+	if not GameManager.is_character_unlocked(_selected_id):
+		return
+	GameManager.start_new_game(_selected_id)
