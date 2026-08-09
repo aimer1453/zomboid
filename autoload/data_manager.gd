@@ -223,6 +223,8 @@ func _register_default_items() -> void:
 		Vector2i(1,1), 60, "", {}, Rarity.COMMON))
 	_add_item(ItemData.new("metal_scrap", "废金属", ItemType.MATERIAL, "从废墟/机械拆解, 建造金属家具使用",
 		Vector2i(1,1), 40, "", {}, Rarity.COMMON))
+	_add_item(ItemData.new("tool", "通用工具", ItemType.MATERIAL, "多功能维修工具, 拆解/修理/制作均可用",
+		Vector2i(1,1), 25, "", {}, Rarity.COMMON))
 	_add_item(ItemData.new("seed_vegetable", "蔬菜种子", ItemType.MATERIAL, "可在室内种植",
 		Vector2i(1,1), 20))
 	_add_item(ItemData.new("blueprint_purifier", "雨水净化器蓝图", ItemType.BLUEPRINT, "解锁雨水净化器",

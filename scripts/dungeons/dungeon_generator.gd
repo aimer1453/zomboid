@@ -59,13 +59,9 @@ func generate(width: int, height: int, seed_val: int = 0) -> void:
 		var b := rooms[i].get_center()
 		_carve_corridor(a, b)
 
-	# 入口: 第一个房间中心附近; 出口: 最后一个房间远离入口处
+	# 入口 = 出口 (同一扇门, 从哪进从哪出, 和真实建筑一致)
 	entrance = rooms[0].get_center()
-	var last_room := rooms[rooms.size() - 1]
-	exit_cell = Vector2i(
-		last_room.position.x + last_room.size.x - 2,
-		last_room.position.y + last_room.size.y - 2
-	)
+	exit_cell = entrance
 	grid[exit_cell.y][exit_cell.x] = 2
 
 

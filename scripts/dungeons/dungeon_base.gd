@@ -135,7 +135,7 @@ func draw_current_floor() -> void:
 				_tilemap.set_cell(Vector2i(x, y), 0, Vector2i(TSB.Tiles.EXIT, 0))
 				if _current_floor == 0:
 					_exit_pos = _world_pos(Vector2i(x, y))
-					# 可见出口: 在 0 楼出口格上方贴"出口"浮标, 让玩家能找到回去的路
+					# 入口即出口: 在 0 楼出入口格上方贴"出口"浮标, 提醒玩家从这里离开
 					_add_tile_label(Vector2i(x, y), "出口", Color(0.45, 1.0, 0.55))
 			else:
 				_tilemap.set_cell(Vector2i(x, y), 0, Vector2i(TSB.Tiles.FLOOR, 0))
@@ -282,7 +282,7 @@ func _spawn_enemies() -> void:
 			continue
 		_spawn_enemy(enemy_scripts[_weighted_pick(weights)], cell)
 
-	# 出口房间放一只精英守卫 (若离玩家太近则跳过, 避免出生即战斗)
+	# 出入口处放一只精英守卫 (若离玩家太近则跳过, 避免出生即战斗)
 	var guard_pos := _world_pos(_generator.exit_cell)
 	if guard_pos.distance_to(_player.global_position) >= tile_size * 7:
 		_spawn_enemy(enemy_scripts[3], _generator.exit_cell)
