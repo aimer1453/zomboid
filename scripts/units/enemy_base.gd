@@ -140,7 +140,7 @@ func _show_screen_alert() -> void:
 	var cl := CanvasLayer.new()
 	cl.layer = 150
 	cl.process_mode = Node.PROCESS_MODE_ALWAYS
-	cl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# 注意: CanvasLayer 不是 Control, 没有 mouse_filter — 拦截由内部 Label(IGNORE) 处理
 	add_child(cl)
 	var lbl := Label.new()
 	lbl.text = "⚠ 被惊动！"
@@ -150,6 +150,7 @@ func _show_screen_alert() -> void:
 	lbl.add_theme_constant_override("outline_size", 6)
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE  # 纯视觉, 不拦截游戏点击
 	var vsize: Vector2 = viewport.get_visible_rect().size
 	lbl.position = Vector2(vsize.x / 2.0 - 220.0, vsize.y * 0.30)
 	lbl.size = Vector2(440, 70)
