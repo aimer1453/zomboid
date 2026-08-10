@@ -93,36 +93,48 @@ func _build_ui() -> void:
 	dsb.content_margin_top = 12
 	dsb.content_margin_bottom = 12
 	detail.add_theme_stylebox_override("panel", dsb)
+	# 详情面板: 水平撑满 vbox (vbox 宽 = 720 - 80 边距 = 640), 垂直继续扩展填剩余空间
+	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	detail.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.add_child(detail)
 
 	var dvbox := VBoxContainer.new()
 	dvbox.add_theme_constant_override("separation", 6)
+	dvbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # 占满 Panel 内部宽
 	detail.add_child(dvbox)
 
 	_detail_title = Label.new()
+	_detail_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_detail_title.add_theme_font_size_override("font_size", 22)
+	_detail_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dvbox.add_child(_detail_title)
 
 	_detail_series = Label.new()
+	_detail_series.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_detail_series.add_theme_font_size_override("font_size", 13)
 	_detail_series.add_theme_color_override("font_color", Color(0.95, 0.8, 0.3))
+	_detail_series.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dvbox.add_child(_detail_series)
 
 	_detail_bg = Label.new()
 	_detail_bg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_detail_bg.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_detail_bg.add_theme_font_size_override("font_size", 13)
 	_detail_bg.add_theme_color_override("font_color", Color(0.82, 0.84, 0.88))
+	_detail_bg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dvbox.add_child(_detail_bg)
 
 	var qlabel := Label.new()
 	qlabel.text = "主线任务"
+	qlabel.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	qlabel.add_theme_font_size_override("font_size", 14)
 	qlabel.add_theme_color_override("font_color", Color(0.6, 0.85, 0.7))
+	qlabel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dvbox.add_child(qlabel)
 
 	_detail_quest = VBoxContainer.new()
 	_detail_quest.add_theme_constant_override("separation", 3)
+	_detail_quest.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # 任务列表也撑满
 	dvbox.add_child(_detail_quest)
 
 	# 开始按钮
@@ -221,8 +233,10 @@ func _select(id: int) -> void:
 		var s := Label.new()
 		s.text = "%d. %s" % [i + 1, steps[i]]
 		s.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		s.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		s.add_theme_font_size_override("font_size", 13)
 		s.add_theme_color_override("font_color", Color(0.85, 0.87, 0.9))
+		s.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # 占满任务列表列宽
 		_detail_quest.add_child(s)
 	# 开始按钮可用性
 	_start_btn.disabled = not GameManager.is_character_unlocked(id)
