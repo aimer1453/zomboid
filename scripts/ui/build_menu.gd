@@ -113,13 +113,7 @@ func _ready() -> void:
 
 
 func _make_panel_style() -> StyleBoxFlat:
-	var s := StyleBoxFlat.new()
-	s.bg_color = Color(0.08, 0.09, 0.12, 0.94)
-	s.border_color = Color(0.4, 0.45, 0.55, 0.8)
-	s.set_border_width_all(2)
-	s.set_corner_radius_all(10)
-	s.set_content_margin_all(10)
-	return s
+	return UiStyle.standard_panel(14, 12)
 
 
 func _make_row(name: String, cost: Dictionary, button_text: String, affordable: bool, on_press: Callable) -> HBoxContainer:

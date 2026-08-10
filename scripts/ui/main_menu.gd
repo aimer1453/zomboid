@@ -27,6 +27,7 @@ var _detail_title: Label = null
 var _detail_series: Label = null
 var _detail_bg: Label = null
 var _detail_quest: VBoxContainer = null
+var _prog_label: Label = null       # 头部右上 N/5 序号, 跟随选中变化
 var _fab: Button = null
 
 
@@ -86,20 +87,21 @@ func _build_ui() -> void:
 	sub.add_theme_color_override("font_color", Color(1, 1, 1, 0.85))
 	title_box.add_child(sub)
 
-	# 右上角: 已解锁 X/5
+	# 右上角: 当前选中序号 / 总数 (跟随 _selected_id 变化, 选第 N 个显示 N/5)
 	var prog := VBoxContainer.new()
 	prog.alignment = BoxContainer.ALIGNMENT_END
 	hbox.add_child(prog)
 
 	var prog_l := Label.new()
-	prog_l.text = "%d / 5" % GameManager.unlocked_characters.size()
+	prog_l.text = "%d / 5" % (CHAR_ORDER.find(_selected_id) + 1)
 	prog_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	prog_l.add_theme_font_size_override("font_size", 22)
 	prog_l.add_theme_color_override("font_color", Palette.LIGHT)
 	prog.add_child(prog_l)
+	_prog_label = prog_l
 
 	var prog_s := Label.new()
-	prog_s.text = "已解锁"
+	prog_s.text = "选择序号"
 	prog_s.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	prog_s.add_theme_font_size_override("font_size", 11)
 	prog_s.add_theme_color_override("font_color", Color(1, 1, 1, 0.7))
@@ -397,6 +399,9 @@ func _style_fab(b: Button) -> void:
 
 func _select(id: int) -> void:
 	_selected_id = id
+	# 头部 N/5 同步当前选中序号
+	if _prog_label:
+		_prog_label.text = "%d / 5" % (CHAR_ORDER.find(_selected_id) + 1)
 	# 刷新所有行样式
 	for cid in _rows.keys():
 		_apply_row_style(_rows[cid], cid == _selected_id)

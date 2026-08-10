@@ -40,16 +40,7 @@ func _ready() -> void:
 	_panel = PanelContainer.new()
 	_panel.visible = false
 	_panel.set_anchors_preset(Control.PRESET_CENTER)
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.1, 0.1, 0.13, 0.96)
-	sb.border_color = Color(0.55, 0.55, 0.65)
-	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(10)
-	sb.content_margin_left = 14
-	sb.content_margin_right = 14
-	sb.content_margin_top = 12
-	sb.content_margin_bottom = 12
-	_panel.add_theme_stylebox_override("panel", sb)
+	_panel.add_theme_stylebox_override("panel", UiStyle.standard_panel(14, 14))
 
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 6)

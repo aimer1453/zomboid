@@ -42,16 +42,7 @@ func _build_panel() -> void:
 	_panel.offset_right = 240
 	_panel.offset_top = -300
 	_panel.offset_bottom = 300
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.12, 0.13, 0.16, 0.98)
-	sb.border_color = Color(0.6, 0.6, 0.7)
-	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(14)
-	sb.content_margin_left = 24
-	sb.content_margin_right = 24
-	sb.content_margin_top = 18
-	sb.content_margin_bottom = 18
-	_panel.add_theme_stylebox_override("panel", sb)
+	_panel.add_theme_stylebox_override("panel", UiStyle.standard_panel(16, 22))
 
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 12)

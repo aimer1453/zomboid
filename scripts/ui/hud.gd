@@ -895,16 +895,7 @@ func _build_panel() -> void:
 	_panel = PanelContainer.new()
 	_panel.set_anchors_preset(Control.PRESET_CENTER)
 	_panel.offset_top = -80  # 居中偏上 (用户反馈: 背包 UI 在正中心偏上一点)
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.1, 0.1, 0.13, 0.97)
-	sb.border_color = Color(0.55, 0.55, 0.65)
-	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(12)
-	sb.content_margin_left = 16
-	sb.content_margin_right = 16
-	sb.content_margin_top = 14
-	sb.content_margin_bottom = 14
-	_panel.add_theme_stylebox_override("panel", sb)
+	_panel.add_theme_stylebox_override("panel", UiStyle.standard_panel(14, 16))
 
 	# 内容包 ScrollContainer: 面板内容高 (装备栏+Tab+4×4+状态页) 会超出屏幕底部
 	# (用户反馈: 关闭按钮在最下面超出界面范围), 限制可视高度可滚动
