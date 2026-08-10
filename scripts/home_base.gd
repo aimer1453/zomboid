@@ -717,6 +717,12 @@ func _on_scene_ready() -> void:
 	_setup_survival_links()
 	# 新手引导: 开场提示
 	if GameManager and GameManager.is_tutorial_mode():
+		# 教程初始材料 (用户反馈: 教程让研究建造床/储物箱但没给材料过不了):
+		# 储物箱 research wood1+nail1 / build wood3+nail2; 床 research wood2 / build wood3+cloth2
+		# → 合计 wood9/nail3/cloth2, 发 wood10/nail5/cloth3 富余; force 绕过负重 (新手特供)
+		InventoryBackpack.force_add_item("wood", 10)
+		InventoryBackpack.force_add_item("nail", 5)
+		InventoryBackpack.force_add_item("cloth", 3)
 		_show_tutorial_hint("你在家园废墟中醒来。打开背包，把木棒装备到武器槽；然后走到花园点击丧尸发起攻击")
 	_setup_build_menu()
 	# 读档恢复房屋扩建 (BuildingManager.room_expansions 持久化)
