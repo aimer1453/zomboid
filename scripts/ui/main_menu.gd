@@ -35,6 +35,7 @@ var _back_btn: Button = null
 var _selected_id: int = GameManager.CharacterID.SPECIAL_FORCE
 var _rows: Dictionary = {}
 var _detail_title: Label = null
+var _detail_status: Label = null  # 解锁状态行 (已解锁/未解锁+条件)
 var _detail_series: Label = null
 var _detail_bg: Label = null
 var _detail_quest: VBoxContainer = null
@@ -57,11 +58,10 @@ func _ready() -> void:
 
 
 func _build_ui() -> void:
-	# 渐变背景 (深蓝顶 → 更深底)
-	var bg := TextureRect.new()
-	bg.texture = Palette.bg_gradient()
+	# 主页背景: header 同色浅蓝 (#4E7D96) — 点新开始时这个蓝向上滑, 形成 select 界面 header 上半部分
+	var bg := ColorRect.new()
+	bg.color = Palette.HEADER_BG
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 
@@ -73,7 +73,7 @@ func _build_ui() -> void:
 	_title.add_theme_color_override("font_color", Palette.BLUE)
 	_title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.55))
 	_title.add_theme_constant_override("outline_size", 6)
-	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_title.z_index = 10
 	add_child(_title)
 
@@ -88,7 +88,7 @@ func _build_ui() -> void:
 	add_child(_home_btns)
 
 	var new_btn := Button.new()
-	new_btn.text = "新的开始"
+	new_btn.text = "▶  新的开始"
 	new_btn.custom_minimum_size = Vector2(0, 66)
 	new_btn.add_theme_font_size_override("font_size", 22)
 	UiStyle.apply_button(new_btn, UiStyle.cta_button_states())
@@ -119,8 +119,10 @@ func _build_ui() -> void:
 	_back_btn = Button.new()
 	_back_btn.text = "‹ 返回"
 	_back_btn.custom_minimum_size = Vector2(96, 44)
-	_back_btn.position = Vector2(20, 20)
+	_back_btn.position = Vector2(28, 20)  # 左缘与标题/副标题对齐 x=28
 	_back_btn.add_theme_font_size_override("font_size", 16)
+	# 按钮内文字靠左 (与标题/副标题同左缘对齐)
+	_back_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	UiStyle.apply_button(_back_btn, UiStyle.pill_button_states(Palette.LIGHT))
 	_back_btn.modulate.a = 0.0
 	_back_btn.mouse_filter = Control.MOUSE_FILTER_IGNORE  # home 态透明不拦截
@@ -247,6 +249,11 @@ func _build_select_ui(root: Control) -> void:
 	_detail_title.add_theme_font_size_override("font_size", 26)
 	_detail_title.add_theme_color_override("font_color", Palette.DARK)
 	dv.add_child(_detail_title)
+
+	_detail_status = Label.new()
+	_detail_status.add_theme_font_size_override("font_size", 15)
+	_detail_status.add_theme_color_override("font_color", Palette.TEXT_SECONDARY)
+	dv.add_child(_detail_status)
 
 	_detail_series = Label.new()
 	_detail_series.add_theme_font_size_override("font_size", 16)
@@ -468,6 +475,18 @@ func _select(id: int) -> void:
 	_detail_title.text = GameManager.get_character_name(id)
 	_detail_series.text = GameManager.get_character_series(id)
 	_detail_bg.text = GameManager.get_character_background(id)
+	# 状态行: 已解锁=绿色文字"● 已解锁"; 未解锁=橙色文字"🔒 未解锁 — 条件"
+	var unlocked: bool = GameManager.is_character_unlocked(id)
+	if unlocked:
+		_detail_status.text = "●  已解锁"
+		_detail_status.add_theme_color_override("font_color", Color(0.30, 0.65, 0.40))
+		_fab.text = "▶"
+		_fab.disabled = false
+	else:
+		_detail_status.text = "🔒  未解锁 — " + GameManager.get_unlock_hint(id)
+		_detail_status.add_theme_color_override("font_color", Palette.ORANGE)
+		_fab.text = "🔒"
+		_fab.disabled = true
 	for c in _detail_quest.get_children():
 		c.queue_free()
 	var steps: Array = GameManager.get_character_quest(id)
@@ -479,7 +498,6 @@ func _select(id: int) -> void:
 		s.add_theme_color_override("font_color", Color(0.28, 0.32, 0.40))
 		s.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_detail_quest.add_child(s)
-	_fab.disabled = not GameManager.is_character_unlocked(id)
 
 
 func _on_continue() -> void:
