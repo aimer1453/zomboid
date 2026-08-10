@@ -202,7 +202,9 @@ func start_new_game(character: CharacterID) -> void:
 		remove_meta("home_return")
 	# 新游戏: 家园醒来 + 新手引导 (P1 开场流程)
 	# 从未完成过教程 → 开教程; 完成过 → 老玩家直接正常开局 (不再重复教学)
-	_tutorial_active = not _tutorial_done_once
+	# 新游戏: 家园醒来 + 新手引导
+	# 每次新游戏都开教程 (用户要求; 随时可点"跳过教程"按钮兜底), 完成标志仅作统计
+	_tutorial_active = true
 	change_state(GameState.EXPLORING)
 	if get_tree():
 		get_tree().call_deferred("change_scene_to_file", "res://scenes/home_base.tscn")

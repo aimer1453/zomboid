@@ -642,6 +642,7 @@ func _build_button() -> void:
 	_backpack_btn.custom_minimum_size = Vector2(94, 88)
 	_backpack_btn.add_theme_font_size_override("font_size", 20)
 	_backpack_btn.pressed.connect(_toggle_backpack)
+	_style_bottom_bar_btn(_backpack_btn)
 	bar.add_child(_backpack_btn)
 
 	# 异能按钮 (替代 AbilityTreeUI 原右上角的 _btn, 统一放底部)
@@ -650,6 +651,7 @@ func _build_button() -> void:
 	ability_btn.custom_minimum_size = Vector2(94, 88)
 	ability_btn.add_theme_font_size_override("font_size", 20)
 	ability_btn.pressed.connect(_toggle_ability)
+	_style_bottom_bar_btn(ability_btn)
 	bar.add_child(ability_btn)
 
 	var save_btn := Button.new()
@@ -657,6 +659,7 @@ func _build_button() -> void:
 	save_btn.custom_minimum_size = Vector2(94, 88)
 	save_btn.add_theme_font_size_override("font_size", 18)
 	save_btn.pressed.connect(_on_save_load_pressed)
+	_style_bottom_bar_btn(save_btn)
 	bar.add_child(save_btn)
 
 	# 任务按钮 (打开当前角色主线任务面板)
@@ -665,7 +668,16 @@ func _build_button() -> void:
 	quest_btn.custom_minimum_size = Vector2(94, 88)
 	quest_btn.add_theme_font_size_override("font_size", 20)
 	quest_btn.pressed.connect(_toggle_quest)
+	_style_bottom_bar_btn(quest_btn)
 	bar.add_child(quest_btn)
+
+
+## 底部按钮统一胶囊风格 (与开始界面一致: 透明底+蓝色描边+hover 浅蓝填充+浅色文字)
+func _style_bottom_bar_btn(b: Button) -> void:
+	UiStyle.apply_button(b, UiStyle.pill_button_states(Palette.BLUE))
+	b.add_theme_color_override("font_color", Palette.LIGHT)
+	b.add_theme_color_override("font_hover_color", Palette.LIGHT)
+	b.add_theme_color_override("font_pressed_color", Palette.ORANGE)
 
 
 ## 存档/读档: 打开统一多槽位管理面板

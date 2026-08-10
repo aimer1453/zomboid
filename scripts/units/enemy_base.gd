@@ -128,6 +128,36 @@ func show_alert() -> void:
 	if _alert_label:
 		_alert_label.visible = true
 		_alert_timer = ALERT_DURATION
+	# 屏幕中上方大提示 (用户反馈: 头顶小 ! 不明显且在下方 → 加全屏中上方警示)
+	_show_screen_alert()
+
+
+## 屏幕中上方警示横幅: "被惊动！" 大字, 1.4s 后淡出 (独立 CanvasLayer, 不随丧尸滚动)
+func _show_screen_alert() -> void:
+	var viewport := get_viewport()
+	if viewport == null:
+		return
+	var cl := CanvasLayer.new()
+	cl.layer = 150
+	cl.process_mode = Node.PROCESS_MODE_ALWAYS
+	cl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(cl)
+	var lbl := Label.new()
+	lbl.text = "⚠ 被惊动！"
+	lbl.add_theme_font_size_override("font_size", 36)
+	lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.5))
+	lbl.add_theme_color_override("font_outline_color", Color(0.15, 0.05, 0.0, 0.9))
+	lbl.add_theme_constant_override("outline_size", 6)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var vsize: Vector2 = viewport.get_visible_rect().size
+	lbl.position = Vector2(vsize.x / 2.0 - 220.0, vsize.y * 0.30)
+	lbl.size = Vector2(440, 70)
+	cl.add_child(lbl)
+	var tw := cl.create_tween()
+	tw.tween_interval(1.1)
+	tw.tween_property(lbl, "modulate:a", 0.0, 0.5)
+	tw.tween_callback(cl.queue_free)
 
 
 ## 卷入战斗 (公开, 供 TurnManager.propagate_aggro 调用): 仅首次设置并亮感叹号
