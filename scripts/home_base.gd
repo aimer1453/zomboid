@@ -802,6 +802,45 @@ func _run_auto_test() -> void:
 	_test_zombie_vision()
 	# 墙体阻挡 + 格子尺寸一致性: 墙格不可走, 格子 = tile_size 等大
 	_test_wall_blocking()
+	# 读档恢复: JSON 风格存档数据(普通 Array/float) 应完整恢复不崩
+	_test_load_restore()
+
+
+## 读档恢复回归: 模拟 JSON 存档(普通 Array/float, 非类型化) → apply_pending_player_data 完整恢复不崩
+## 曾崩溃: data.get("learned_passives") 是普通 Array, 直接赋给 Array[String] → SCRIPT ERROR 中断 deserialize
+func _test_load_restore() -> void:
+	var ok := true
+	var backup_hp: float = _player.hp
+	var fake_data := {
+		"hp": 123.0,
+		"max_hp": 200.0,
+		"ap_current": 7.0,
+		"ap_max": 10.0,
+		"attack_power": 25.0,
+		"defense": 6.0,
+		"hunger": 80.0,
+		"thirst": 70.0,
+		"skill_points": 5.0,
+		"absorption_power": 1.0,
+		"learned_abilities": [],
+		"learned_passives": ["sf_iron_skin"],
+		"equipped_slots": {"weapon": "pistol"},
+		"position": {"x": 144.0, "y": 176.0},
+	}
+	GameManager._pending_player_data = fake_data
+	GameManager.apply_pending_player_data(_player)
+	if not is_equal_approx(_player.hp, 123.0):
+		ok = false
+		push_error("[Load] HP 未恢复: ", _player.hp)
+	if _player.learned_passives.size() != 1 or _player.learned_passives[0] != "sf_iron_skin":
+		ok = false
+		push_error("[Load] 被动异能未恢复: ", _player.learned_passives)
+	if _player.has_method("get_equipped_item") and _player.get_equipped_item("weapon") != "pistol":
+		ok = false
+		push_error("[Load] 武器未恢复: ", _player.get_equipped_item("weapon"))
+	# 恢复现场, 避免影响后续逻辑
+	_player.hp = backup_hp
+	print("=== 自动测试: 读档恢复(JSON类型)=", ok, " (应为 true)")
 
 
 ## 工作台交互回归: 模拟左键点击工作台格 (3,2) → 应打开建造/研究面板

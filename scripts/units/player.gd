@@ -577,7 +577,10 @@ func deserialize(data: Dictionary) -> void:
 		InventoryBackpack.max_weight = get_carry_capacity()
 	skill_points = int(data.get("skill_points", 3))
 	absorption_power = float(data.get("absorption_power", 1.0))
-	learned_passives = data.get("learned_passives", [])
+	learned_passives.clear()
+	# JSON 反序列化出来的是普通 Array, 不能直接赋给 Array[String] (类型不匹配 SCRIPT ERROR)
+	for pid in data.get("learned_passives", []):
+		learned_passives.append(str(pid))
 
 	# 异能: 按 action_id 从数据库重建 Resource (被动保持 id 列表)
 	learned_abilities.clear()
