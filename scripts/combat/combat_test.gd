@@ -147,6 +147,8 @@ func _run_auto_test() -> void:
 	_test_combat_blocks_floor_menu()
 	# Issue B 距离限制回归 (全同步, 放最前保证 headless 帧信号不稳时也能跑到)
 	_test_corpse_loot_proximity()
+	# 叠尸挪位回归 (全同步, 提前跑确保覆盖)
+	_test_corpse_no_overlap()
 	# 探索连续移动验证: 向左走2格再走回来 (确认移动一次后还能继续移动)
 	print("=== 自动测试: 探索连续移动 (左2格) ===")
 	_player.move_to_cell(_player.global_position + Vector2(-tile_size * 2, 0))
@@ -186,6 +188,7 @@ func _run_auto_test() -> void:
 	_test_durability()
 	_test_corpse_priority()
 	_test_corpse_spawn_cell()
+	_test_corpse_no_overlap()
 	_test_wall_walk_block()
 	_test_click_path_no_wall()
 	_test_flee_two_stage()
@@ -1514,6 +1517,37 @@ func _test_corpse_spawn_cell() -> void:
 			remove_corpse(c)
 	if is_instance_valid(enemy):
 		enemy.queue_free()
+
+
+## 叠尸回归: 两个丧尸同格阵亡 → 第二具尸体必须挪到相邻空位, 不得与第一具同格
+func _test_corpse_no_overlap() -> void:
+	var corpse_script: Script = load("res://scripts/tiles/corpse.gd")
+	var cell := Vector2i(8, 8)
+	# 先在 (8,8) 放一具尸体 (模拟先死的丧尸)
+	var c1: Node = corpse_script.new()
+	c1.setup_corpse(cell, tile_size, ["bandage"], "占位尸体")
+	add_child(c1)
+	add_corpse(c1)
+	var ok := true
+	if is_cell_free_for_corpse(cell):
+		push_error("[CorpseOverlap] (8,8) 已放尸体却判定为空")
+		ok = false
+	var nudged := find_free_corpse_cell(cell)
+	if nudged == cell:
+		push_error("[CorpseOverlap] 同格已占用却未挪开, 仍返回=%s" % cell)
+		ok = false
+	# 模拟第二具尸体落到 nudged 格, 再查一次应仍不冲突
+	var c2: Node = corpse_script.new()
+	c2.setup_corpse(nudged, tile_size, ["bandage"], "第二具")
+	add_child(c2)
+	add_corpse(c2)
+	if c1.grid_pos == c2.grid_pos:
+		push_error("[CorpseOverlap] 两具尸体同格: c1=%s c2=%s" % [c1.grid_pos, c2.grid_pos])
+		ok = false
+	else:
+		print("=== 自动测试: 叠尸挪位=%s (已占用格=%s, 第二具落在=%s) 不重叠=true" % [ok, cell, c2.grid_pos])
+	c1.queue_free(); c2.queue_free()
+	remove_corpse(c1); remove_corpse(c2)
 
 
 ## 全部拿走按钮回归: 模拟点击 → 尸体清空 + 物品进背包 (修复: 场景 _input 抢事件导致按钮失效)

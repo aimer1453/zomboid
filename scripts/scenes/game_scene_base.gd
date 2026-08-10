@@ -218,6 +218,35 @@ func add_corpse(c: Node) -> void:
 func remove_corpse(c: Node) -> void:
 	_corpses.erase(c)
 
+## 某格是否无其它尸体占用 (避免叠尸): 丧尸死后落点已有一具尸体时, 应挪到旁边空位
+func is_cell_free_for_corpse(cell: Vector2i) -> bool:
+	for c in _corpses:
+		if is_instance_valid(c) and c.has_method("get_grid_pos") and c.get_grid_pos() == cell:
+			return false
+	return true
+
+## 找一个靠近 cell 的可放尸体格: 优先原地, 其次 4 向, 再 8 向; 优先可通行格 (挤满则原地)
+func find_free_corpse_cell(cell: Vector2i) -> Vector2i:
+	if is_cell_free_for_corpse(cell):
+		return cell
+	var offsets: Array[Vector2i] = [
+		Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1),
+		Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1),
+	]
+	var any_fallback: Vector2i = cell
+	for off in offsets:
+		var c: Vector2i = cell + off
+		if not is_cell_free_for_corpse(c):
+			continue
+		var walk := true
+		if has_method("is_cell_walkable"):
+			walk = is_cell_walkable(_world_pos(c))
+		if walk:
+			return c
+		if any_fallback == cell:
+			any_fallback = c
+	return any_fallback
+
 
 ## 注册地面物品 (ContainerUI 丢弃 / 拾取后移除)
 func add_ground_item(gi: Node) -> void:

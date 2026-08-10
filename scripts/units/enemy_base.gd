@@ -393,6 +393,9 @@ func _spawn_corpse() -> void:
 	# 用 floor 取整 (与 game_scene_base._cell_of / Tile.world_to_grid 一致): 活体停在格中心时
 	# center/tile = cell + 0.5, roundi 会进位到 cell+1 → 尸体偏到右下角一格; 必须用 floor 落在丧尸所在格
 	var gp := Vector2i(floori(global_position.x / tile_size), floori(global_position.y / tile_size))
+	# 该格已有一具尸体(多个丧尸同格阵亡) → 挪到旁边空位, 避免叠尸重叠看不见
+	if world.has_method("find_free_corpse_cell"):
+		gp = world.find_free_corpse_cell(gp)
 	# 尸体标签: "普通丧尸\n(尸体)" 两行, 居中 (用户反馈: 不居中 + 格式)
 	corpse.setup_corpse(gp, tile_size, loot, "%s\n(尸体)" % enemy_name)
 	world.add_child(corpse)
