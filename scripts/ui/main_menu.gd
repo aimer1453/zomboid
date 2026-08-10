@@ -1,10 +1,11 @@
 extends Control
 
 # ============================================================
-# MainMenu — 开始游戏界面 (手机 App 卡片化风格)
+# MainMenu — 主页面 → 角色选择 (两阶段, 带过渡动画)
 # ============================================================
-# 设计参考: 顶部蓝色大圆角 Header + 白色内容大卡(内含彩色 tag 列表) + 橙色 FAB
-# 配色/圆角/留白走 Palette 统一
+# 主页面: 居中大标题 + [新的开始] [继续游戏]
+# 点"新的开始": 标题平移缩小到左上角, 角色选择卡片上滑入场,
+#             继续游戏隐藏, 左上出现 [‹ 返回] 可回主页面
 
 const CHAR_ORDER := [
 	GameManager.CharacterID.SPECIAL_FORCE,
@@ -21,18 +22,38 @@ const AVATAR_COLORS := [
 	Color("#9B7BB8"),  # PSYCHIC 紫
 ]
 
+var _state := "home"  # home | select
+
+# 主页面元素
+var _title: Label = null
+var _home_btns: VBoxContainer = null
+
+# 选择界面元素
+var _select_root: Control = null
+var _back_btn: Button = null
+
 var _selected_id: int = GameManager.CharacterID.SPECIAL_FORCE
-var _rows: Dictionary = {}          # id -> PanelContainer (角色行)
+var _rows: Dictionary = {}
 var _detail_title: Label = null
 var _detail_series: Label = null
 var _detail_bg: Label = null
 var _detail_quest: VBoxContainer = null
-var _prog_label: Label = null       # 头部右上 N/5 序号, 跟随选中变化
+var _prog_label: Label = null
 var _fab: Button = null
+
+var TITLE_HOME_POS := Vector2(0, 500)  # 主页面居中 (x 按文字宽度运行时算)
+const TITLE_SELECT_POS := Vector2(44, 52)
+const TITLE_HOME_FONT := 52
+const TITLE_SELECT_SCALE := 0.5
 
 
 func _ready() -> void:
 	_build_ui()
+	# 等一帧让 Label 完成布局, 计算居中位置
+	await get_tree().process_frame
+	_title.pivot_offset = _title.size / 2.0
+	TITLE_HOME_POS.x = (720.0 - _title.size.x) / 2.0
+	_title.position = TITLE_HOME_POS
 
 
 func _build_ui() -> void:
@@ -44,10 +65,72 @@ func _build_ui() -> void:
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 
-	# === 顶部蓝色大圆角 Header (顶部超出屏不可见 → 只见底部圆角融入卡片) ===
+	# ============ 主页面: 居中大标题 + 两个主按钮 ============
+	_title = Label.new()
+	_title.text = "末 日 生 存"
+	_title.add_theme_font_size_override("font_size", TITLE_HOME_FONT)
+	_title.add_theme_color_override("font_color", Palette.ORANGE)
+	_title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.45))
+	_title.add_theme_constant_override("outline_size", 6)
+	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_title.z_index = 10
+	add_child(_title)
+
+	_home_btns = VBoxContainer.new()
+	_home_btns.add_theme_constant_override("separation", 18)
+	_home_btns.set_anchors_preset(Control.PRESET_CENTER)
+	_home_btns.offset_left = -180
+	_home_btns.offset_right = 180
+	_home_btns.offset_top = 150
+	_home_btns.offset_bottom = 330
+	_home_btns.alignment = BoxContainer.ALIGNMENT_CENTER
+	add_child(_home_btns)
+
+	var new_btn := Button.new()
+	new_btn.text = "新的开始"
+	new_btn.custom_minimum_size = Vector2(0, 66)
+	new_btn.add_theme_font_size_override("font_size", 22)
+	UiStyle.apply_button(new_btn, UiStyle.cta_button_states())
+	new_btn.pressed.connect(_transition_select)
+	_home_btns.add_child(new_btn)
+
+	if GameManager.has_save():
+		var cont := Button.new()
+		cont.text = "继续游戏"
+		cont.custom_minimum_size = Vector2(0, 60)
+		cont.add_theme_font_size_override("font_size", 20)
+		UiStyle.apply_button(cont, UiStyle.pill_button_states(Palette.BLUE))
+		cont.pressed.connect(_on_continue)
+		_home_btns.add_child(cont)
+
+	# ============ 选择界面 (初始整体下移+透明, 由动画滑入) ============
+	_select_root = Control.new()
+	_select_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_select_root.modulate.a = 0.0
+	_select_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_select_root.position.y = 140
+	add_child(_select_root)
+
+	_build_select_ui(_select_root)
+
+	# 返回按钮 (左上角, 初始透明)
+	_back_btn = Button.new()
+	_back_btn.text = "‹ 返回"
+	_back_btn.custom_minimum_size = Vector2(96, 44)
+	_back_btn.position = Vector2(20, 20)
+	_back_btn.add_theme_font_size_override("font_size", 16)
+	UiStyle.apply_button(_back_btn, UiStyle.pill_button_states(Palette.LIGHT))
+	_back_btn.modulate.a = 0.0
+	_back_btn.z_index = 20
+	_back_btn.pressed.connect(_transition_home)
+	add_child(_back_btn)
+
+
+func _build_select_ui(root: Control) -> void:
+	# 顶部蓝色大圆角 Header (顶部出屏 → 只见底部圆角)
 	var header := PanelContainer.new()
 	header.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	header.offset_top = -32   # 上沿出屏
+	header.offset_top = -32
 	header.offset_bottom = 320
 	header.offset_left = 0
 	header.offset_right = 0
@@ -56,11 +139,11 @@ func _build_ui() -> void:
 	hsb.set_corner_radius_all(28)
 	hsb.content_margin_left = 28
 	hsb.content_margin_right = 28
-	hsb.content_margin_top = 80
+	hsb.content_margin_top = 90
 	hsb.content_margin_bottom = 24
 	header.add_theme_stylebox_override("panel", hsb)
 	header.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(header)
+	root.add_child(header)
 
 	var hbox := HBoxContainer.new()
 	hbox.add_theme_constant_override("separation", 12)
@@ -68,26 +151,16 @@ func _build_ui() -> void:
 	hbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	header.add_child(hbox)
 
-	var title_box := VBoxContainer.new()
-	title_box.add_theme_constant_override("separation", 4)
-	title_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hbox.add_child(title_box)
-
-	var t := Label.new()
-	t.text = "末 日 生 存"
-	t.add_theme_font_size_override("font_size", 38)
-	t.add_theme_color_override("font_color", Palette.LIGHT)
-	t.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.35))
-	t.add_theme_constant_override("outline_size", 4)
-	title_box.add_child(t)
-
 	var sub := Label.new()
 	sub.text = "选择你的幸存者"
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sub.add_theme_font_size_override("font_size", 15)
 	sub.add_theme_color_override("font_color", Color(1, 1, 1, 0.85))
-	title_box.add_child(sub)
+	sub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sub.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	hbox.add_child(sub)
 
-	# 右上角: 当前选中序号 / 总数 (跟随 _selected_id 变化, 选第 N 个显示 N/5)
+	# 右上角: 当前选中序号 / 总数 (跟随选中变化)
 	var prog := VBoxContainer.new()
 	prog.alignment = BoxContainer.ALIGNMENT_END
 	hbox.add_child(prog)
@@ -107,11 +180,11 @@ func _build_ui() -> void:
 	prog_s.add_theme_color_override("font_color", Color(1, 1, 1, 0.7))
 	prog.add_child(prog_s)
 
-	# === 白色内容大卡 (与 header 底部圆角衔接, 下探到屏幕底部) ===
+	# 白色内容大卡
 	var card := PanelContainer.new()
 	card.set_anchors_preset(Control.PRESET_FULL_RECT)
-	card.offset_top = 280   # 与 header 底部 ~280 重叠
-	card.offset_bottom = -20 # 屏幕底部留边距
+	card.offset_top = 280
+	card.offset_bottom = -20
 	card.offset_left = 16
 	card.offset_right = -16
 	var csb := StyleBoxFlat.new()
@@ -125,7 +198,7 @@ func _build_ui() -> void:
 	csb.shadow_size = 6
 	csb.shadow_offset = Vector2(0, 2)
 	card.add_theme_stylebox_override("panel", csb)
-	add_child(card)
+	root.add_child(card)
 
 	var cvbox := VBoxContainer.new()
 	cvbox.add_theme_constant_override("separation", 10)
@@ -133,30 +206,13 @@ func _build_ui() -> void:
 	cvbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	card.add_child(cvbox)
 
-	# 标题行 (左标题 + 右继续游戏按钮)
-	var top_row := HBoxContainer.new()
-	top_row.add_theme_constant_override("separation", 10)
-	top_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	cvbox.add_child(top_row)
-
 	var card_title := Label.new()
 	card_title.text = "选择幸存者"
 	card_title.add_theme_font_size_override("font_size", 22)
 	card_title.add_theme_color_override("font_color", Palette.DARK)
 	card_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	card_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	top_row.add_child(card_title)
+	cvbox.add_child(card_title)
 
-	if GameManager.has_save():
-		var cont := Button.new()
-		cont.text = "继续游戏  ▶"
-		cont.custom_minimum_size = Vector2(140, 36)
-		cont.add_theme_font_size_override("font_size", 14)
-		_style_pill(cont, Palette.BLUE)
-		cont.pressed.connect(_on_continue)
-		top_row.add_child(cont)
-
-	# 角色列表 (每行一个 PanelContainer, 圆角 14, 可点击)
 	var list := VBoxContainer.new()
 	list.add_theme_constant_override("separation", 8)
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -168,18 +224,11 @@ func _build_ui() -> void:
 		_rows[id] = row
 		list.add_child(row)
 
-	# 详情区 (选中行下方固定 ~130 高, 显示背景/任务)
+	# 详情区
 	var detail := PanelContainer.new()
 	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	detail.custom_minimum_size = Vector2(0, 230)
-	var dsb := StyleBoxFlat.new()
-	dsb.bg_color = Color(0.93, 0.94, 0.96, 0.9)
-	dsb.set_corner_radius_all(14)
-	dsb.content_margin_left = 14
-	dsb.content_margin_right = 14
-	dsb.content_margin_top = 10
-	dsb.content_margin_bottom = 10
-	detail.add_theme_stylebox_override("panel", dsb)
+	detail.custom_minimum_size = Vector2(0, 220)
+	detail.add_theme_stylebox_override("panel", UiStyle.light_panel(14, 12))
 	cvbox.add_child(detail)
 
 	var dv := VBoxContainer.new()
@@ -214,7 +263,7 @@ func _build_ui() -> void:
 	_detail_quest.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dv.add_child(_detail_quest)
 
-	# === 橙色 FAB (右下角, 游戏主 CTA = 开始游戏) ===
+	# 橙色 FAB (开始游戏)
 	_fab = Button.new()
 	_fab.text = "▶"
 	_fab.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
@@ -222,14 +271,55 @@ func _build_ui() -> void:
 	_fab.offset_right = -32
 	_fab.offset_top = -92
 	_fab.offset_bottom = -32
-	_fab.custom_minimum_size = Vector2(60, 60)
 	_fab.add_theme_font_size_override("font_size", 24)
 	_fab.add_theme_color_override("font_color", Palette.LIGHT)
 	_style_fab(_fab)
 	_fab.pressed.connect(_on_start)
-	add_child(_fab)
+	root.add_child(_fab)
 
 	_select(GameManager.CharacterID.SPECIAL_FORCE)
+
+
+## 主页面 → 选择: 标题平移缩小到左上, 卡片上滑入场, 继续游戏隐藏, 返回按钮出现
+func _transition_select() -> void:
+	if _state == "select":
+		return
+	_state = "select"
+	_title.pivot_offset = _title.size / 2.0
+	var tw := create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(_title, "position", TITLE_SELECT_POS, 0.42) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(_title, "scale", Vector2(TITLE_SELECT_SCALE, TITLE_SELECT_SCALE), 0.42) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(_home_btns, "modulate:a", 0.0, 0.28)
+	tw.tween_property(_select_root, "modulate:a", 1.0, 0.4)
+	tw.tween_property(_select_root, "position:y", 0.0, 0.45) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_property(_back_btn, "modulate:a", 1.0, 0.3)
+	tw.chain().tween_callback(func() -> void:
+		_home_btns.visible = false
+		_select_root.mouse_filter = Control.MOUSE_FILTER_STOP)
+
+
+## 选择 → 主页面 (返回)
+func _transition_home() -> void:
+	if _state == "home":
+		return
+	_state = "home"
+	_select_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_home_btns.visible = true
+	var tw := create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(_title, "position", TITLE_HOME_POS, 0.42) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(_title, "scale", Vector2.ONE, 0.42) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(_home_btns, "modulate:a", 1.0, 0.3)
+	tw.tween_property(_select_root, "modulate:a", 0.0, 0.35)
+	tw.tween_property(_select_root, "position:y", 140.0, 0.4) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	tw.tween_property(_back_btn, "modulate:a", 0.0, 0.2)
 
 
 ## 角色列表行: 圆形 avatar + 名字 + 系列 + 状态 tag + 整行可点击
@@ -246,17 +336,12 @@ func _make_role_row(id: int, avatar_color: Color) -> PanelContainer:
 	hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(hbox)
 
-	# Avatar 圆 (用 ColorRect 模拟)
 	var avatar := PanelContainer.new()
 	avatar.custom_minimum_size = Vector2(52, 52)
 	avatar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var avsb := StyleBoxFlat.new()
 	avsb.bg_color = avatar_color
 	avsb.set_corner_radius_all(26)
-	avsb.content_margin_left = 0
-	avsb.content_margin_right = 0
-	avsb.content_margin_top = 0
-	avsb.content_margin_bottom = 0
 	avatar.add_theme_stylebox_override("panel", avsb)
 	hbox.add_child(avatar)
 
@@ -270,7 +355,6 @@ func _make_role_row(id: int, avatar_color: Color) -> PanelContainer:
 	initial.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	avatar.add_child(initial)
 
-	# 文本 VBox
 	var tv := VBoxContainer.new()
 	tv.add_theme_constant_override("separation", 2)
 	tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -290,7 +374,6 @@ func _make_role_row(id: int, avatar_color: Color) -> PanelContainer:
 	series_l.add_theme_color_override("font_color", Color(0.40, 0.45, 0.52))
 	tv.add_child(series_l)
 
-	# 状态 tag (胶囊)
 	var tag := PanelContainer.new()
 	tag.custom_minimum_size = Vector2(78, 28)
 	tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -298,10 +381,6 @@ func _make_role_row(id: int, avatar_color: Color) -> PanelContainer:
 	var tag_sb := StyleBoxFlat.new()
 	tag_sb.bg_color = Palette.ORANGE if unlocked else Palette.TAG_BG_LOCK
 	tag_sb.set_corner_radius_all(14)
-	tag_sb.content_margin_left = 12
-	tag_sb.content_margin_right = 12
-	tag_sb.content_margin_top = 4
-	tag_sb.content_margin_bottom = 4
 	tag.add_theme_stylebox_override("panel", tag_sb)
 	hbox.add_child(tag)
 
@@ -310,7 +389,7 @@ func _make_role_row(id: int, avatar_color: Color) -> PanelContainer:
 	tag_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tag_l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	tag_l.add_theme_font_size_override("font_size", 12)
-	tag_l.add_theme_color_override("font_color", Palette.LIGHT if unlocked else Palette.LIGHT)
+	tag_l.add_theme_color_override("font_color", Palette.LIGHT)
 	tag_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tag_l.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	tag.add_child(tag_l)
@@ -323,23 +402,15 @@ func _on_row_gui_input(event: InputEvent, id: int) -> void:
 		_select(id)
 
 
-## 行样式: 未选灰白, 选中浅橙白 + 左侧 4px 橙色条
 func _apply_row_style(row: PanelContainer, selected: bool) -> void:
 	var sb := StyleBoxFlat.new()
 	if selected:
 		sb.bg_color = Palette.CARD_LIGHT_ROW_SEL
 		sb.border_color = Palette.ORANGE
 		sb.border_width_left = 4
-		sb.border_width_top = 0
-		sb.border_width_right = 0
-		sb.border_width_bottom = 0
 	else:
 		sb.bg_color = Palette.CARD_LIGHT_ROW
 		sb.border_color = Color(0, 0, 0, 0)
-		sb.border_width_left = 0
-		sb.border_width_top = 0
-		sb.border_width_right = 0
-		sb.border_width_bottom = 0
 	sb.set_corner_radius_all(14)
 	sb.content_margin_left = 12
 	sb.content_margin_right = 12
@@ -351,31 +422,6 @@ func _apply_row_style(row: PanelContainer, selected: bool) -> void:
 	row.add_theme_stylebox_override("panel", sb)
 
 
-## 胶囊按钮 (继续游戏): 透明底+蓝色边框
-func _style_pill(b: Button, accent: Color) -> void:
-	for state in ["normal", "hover", "pressed"]:
-		var sb := StyleBoxFlat.new()
-		match state:
-			"normal":
-				sb.bg_color = Color(0, 0, 0, 0)
-				sb.border_color = accent
-			"hover":
-				sb.bg_color = Color(accent.r, accent.g, accent.b, 0.18)
-			"pressed":
-				sb.bg_color = Color(accent.r, accent.g, accent.b, 0.32)
-		sb.set_border_width_all(2)
-		sb.set_corner_radius_all(18)
-		sb.content_margin_left = 14
-		sb.content_margin_right = 14
-		sb.content_margin_top = 6
-		sb.content_margin_bottom = 6
-		b.add_theme_stylebox_override(state, sb)
-	b.add_theme_color_override("font_color", accent)
-	b.add_theme_color_override("font_hover_color", Palette.ORANGE)
-	b.add_theme_color_override("font_pressed_color", Palette.ORANGE)
-
-
-## FAB (主 CTA): 橙色填充, 圆 + 阴影
 func _style_fab(b: Button) -> void:
 	for state in ["normal", "hover", "pressed", "disabled"]:
 		var sb := StyleBoxFlat.new()
@@ -399,18 +445,14 @@ func _style_fab(b: Button) -> void:
 
 func _select(id: int) -> void:
 	_selected_id = id
-	# 头部 N/5 同步当前选中序号
 	if _prog_label:
 		_prog_label.text = "%d / 5" % (CHAR_ORDER.find(_selected_id) + 1)
-	# 刷新所有行样式
 	for cid in _rows.keys():
 		_apply_row_style(_rows[cid], cid == _selected_id)
-	# 刷新详情
 	var profile: Dictionary = GameManager.get_character_profile(id)
 	_detail_title.text = GameManager.get_character_name(id)
 	_detail_series.text = GameManager.get_character_series(id)
 	_detail_bg.text = GameManager.get_character_background(id)
-	# 主线任务列表
 	for c in _detail_quest.get_children():
 		c.queue_free()
 	var steps: Array = GameManager.get_character_quest(id)
@@ -422,7 +464,6 @@ func _select(id: int) -> void:
 		s.add_theme_color_override("font_color", Color(0.30, 0.34, 0.42))
 		s.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_detail_quest.add_child(s)
-	# FAB 启用条件
 	_fab.disabled = not GameManager.is_character_unlocked(id)
 
 
