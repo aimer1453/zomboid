@@ -214,6 +214,7 @@ func enter_location(x: int, y: int) -> void:
 		return
 	GameManager.set_meta("pending_dungeon_type", terrain_to_dungeon_type(t))
 	GameManager.set_meta("pending_dungeon_seed", location_seed(x, y))
+	GameManager.set_meta("pending_dungeon_cell", [x, y])
 	GameManager.set_meta("pending_dungeon_name", terrain_name(t))
 	GameManager.change_state(GameManager.GameState.EXPLORING)
 	# 主线里程碑: 探索一处副本 (步骤 2)
@@ -228,6 +229,9 @@ func enter_home() -> void:
 	player_cell = home_cell
 	last_entry_cell = home_cell
 	has_last_entry = true
+	# 标记"从世界地图返回家园" → 出生点改到院门内侧(院子入口), 而非卧室里
+	if GameManager and GameManager.has_method("set_meta"):
+		GameManager.set_meta("home_return", true)
 	# 统一进入家园时的状态, 与 dungeon enter_location 的 HOME 分支一致, 避免缺状态导致 UI/输入不初始化而"卡死"
 	if GameManager and GameManager.has_method("change_state"):
 		GameManager.change_state(GameManager.GameState.EXPLORING)

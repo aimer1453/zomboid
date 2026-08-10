@@ -187,6 +187,9 @@ func start_new_game(character: CharacterID) -> void:
 	# 新游戏: 清空场景内迷雾记忆 (避免上一周目残留家园视野)
 	if FogOfWar:
 		FogOfWar.clear_memories()
+	# 新游戏: 清除可能残留的"返回家园"标记, 确保新游戏从卧室醒来而非院子 (否则死亡后重开可能被误判为"从世界地图返回")
+	if has_meta("home_return"):
+		remove_meta("home_return")
 	# 新游戏: 家园醒来 + 新手引导 (P1 开场流程)
 	_tutorial_active = true
 	change_state(GameState.EXPLORING)

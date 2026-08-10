@@ -86,8 +86,8 @@ func _create_world() -> void:
 		_set_wall(Vector2i(ROOM_X0, y))
 		_set_wall(Vector2i(ROOM_X1, y))
 
-	# 门 (房间下墙中央, 2 格宽开口 → 醒目且易点中): 内侧(4/5,6)为房间地板, 外侧(4/5,8)为花园
-	var door_cells := [DOOR_CELL, Vector2i(5, 7)]
+	# 门 (房间下墙中央, 1 格宽开口): 内侧(4,6)为房间地板, 外侧(4,8)为花园 (用户要求门只 1 格)
+	var door_cells := [DOOR_CELL]
 	for dc in door_cells:
 		_tilemap.set_cell(dc, 0, Vector2i(TSB.Tiles.DOOR, 0))
 		_door_cells[dc] = true
@@ -147,9 +147,14 @@ func is_cell_walkable(cell_center: Vector2) -> bool:
 # --- 玩家 ---
 
 func _create_player() -> void:
-	_player = PF.spawn(self, _world_pos(SPAWN_CELL), tile_size)
+	var spawn := SPAWN_CELL
+	# 从世界地图"返回家园" → 在院门内侧(院子入口)出现, 而不是被传送到卧室里
+	if GameManager and GameManager.has_meta("home_return") and GameManager.get_meta("home_return"):
+		spawn = Vector2i(8, 14)   # 院门(8,15)内一格, 落在院子里
+		GameManager.remove_meta("home_return")
+	_player = PF.spawn(self, _world_pos(spawn), tile_size)
 	_player.world = self
-	print("[HomeBase] 玩家在房间醒来: ", _player.global_position)
+	print("[HomeBase] 玩家", ("返回院门" if spawn != SPAWN_CELL else "在房间醒来"), ": ", _player.global_position)
 
 
 # --- 敌人 + 家具 ---

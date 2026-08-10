@@ -42,10 +42,13 @@ func setup(tilemap: Node, ts: int) -> void:
 
 
 ## 设置记忆键并从全局常驻记忆恢复该场景已探索格 (跨进入保留视野)
+## 键为空或该键无记忆时清空 _explored, 避免换层残留上一层迷雾
 func set_memory_key(k: String) -> void:
 	_mem_key = k
-	if k != "" and _memories.has(k):
-		_explored = _memories[k].duplicate()
+	if k == "":
+		_explored = {}
+	else:
+		_explored = _memories.get(k, {}).duplicate()
 
 
 ## 把当前探索记忆写回全局常驻字典 (离开场景前调用, 或每次 reveal 后)

@@ -26,6 +26,8 @@ var dungeon_height: int = 26
 
 var _generator: RefCounted = null
 var _furniture_list: Array = []
+## 该副本对应的世界地图格坐标 (用于迷雾记忆键, 让同一副本跨进入/读档保留视野)
+var _world_cell: Vector2i = Vector2i.ZERO
 
 # --- 多层建筑 (楼梯换层) ---
 var floor_count: int = 1
@@ -59,6 +61,11 @@ func _ready() -> void:
 	if GameManager.has_meta("pending_dungeon_type"):
 		building_type = int(GameManager.get_meta("pending_dungeon_type", 0))
 		GameManager.remove_meta("pending_dungeon_type")
+	# 读取该副本对应的世界格坐标 (迷雾记忆键用; 必须在基类 _init_fog_of_war 之前)
+	if GameManager.has_meta("pending_dungeon_cell"):
+		var wc: Array = GameManager.get_meta("pending_dungeon_cell", [0, 0])
+		_world_cell = Vector2i(int(wc[0]), int(wc[1]))
+		GameManager.remove_meta("pending_dungeon_cell")
 	# 按建筑类型决定层数 (用户反馈: 公寓应多层, 用楼梯连接)
 	match building_type:
 		BuildingType.APARTMENT: floor_count = 3
@@ -224,6 +231,11 @@ func _create_player() -> void:
 	_exit_armed = false  # 出入口同格时出生即在出口, 必须走开后才允许触发出口
 
 
+## 迷雾记忆键: 按"世界格坐标 + 楼层"持久化, 出去再进同一副本视野不丢(每层独立)
+func _fog_memory_key() -> String:
+	return "dungeon_%d_%d_f%d" % [_world_cell.x, _world_cell.y, _current_floor]
+
+
 # --- 敌人 + 战利品 / 家具 ---
 
 func _spawn_entities() -> void:
@@ -265,6 +277,8 @@ func change_floor(target_floor: int, arrival_cell: Vector2i) -> void:
 	if TurnManager.combat_mode:
 		return  # 战斗中禁止换层, 避免实体被腾空
 	_clear_floor_entities()
+	if _fog != null:
+		_fog.persist_memory()            # 离开前保存上一层迷雾记忆
 	_current_floor = target_floor
 	_generator = _floors[target_floor]
 	draw_current_floor()
@@ -273,6 +287,9 @@ func change_floor(target_floor: int, arrival_cell: Vector2i) -> void:
 		dest = _nudge_off_stairs(arrival_cell)
 	_player.global_position = _world_pos(dest)
 	_player.is_moving = false
+	if _fog != null:
+		_fog.set_memory_key(_fog_memory_key())   # 切到本层记忆(无则清空)
+		_fog.reveal_from(_cell_of(_player.global_position))
 	_exit_armed = false  # 换层落地后须重新走开出口才能触发返回 (防出入口同格一落地就弹回)
 	_floor_switch_guard = 15  # 约 0.25s 内不重复触发, 双重防死循环
 	_refresh_move_grid()
