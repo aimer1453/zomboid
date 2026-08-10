@@ -781,6 +781,8 @@ func _run_auto_test() -> void:
 	print("=== 家园自动测试完成 (初始仅工作台, 其余家具由玩家建造) ===")
 	# 移动/点击路由回归 (排查"无法行走")
 	_test_movement_routing()
+	# 工作台交互: 模拟点击工作台 → 应打开建造/研究面板
+	_test_workbench_interact()
 	# 引导链路: 拿棒球棍 → 装备 → 打丧尸
 	await _test_tutorial_flow()
 	# 生存流水线: 净化/种植/收获/睡觉
@@ -791,6 +793,29 @@ func _run_auto_test() -> void:
 	_test_zombie_vision()
 	# 墙体阻挡 + 格子尺寸一致性: 墙格不可走, 格子 = tile_size 等大
 	_test_wall_blocking()
+
+
+## 工作台交互回归: 模拟左键点击工作台格 (3,2) → 应打开建造/研究面板
+## (覆盖: _unhandled_input → _handle_explore_click → _raycast_interactable(家具) → _on_interact → WORKBENCH 分支)
+func _test_workbench_interact() -> void:
+	var ok := true
+	if _build_menu == null:
+		ok = false
+		push_error("[Workbench] 建造菜单未初始化")
+	else:
+		_build_menu.visible = false
+	_player.is_moving = false
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = true
+	ev.position = get_canvas_transform() * _world_pos(Vector2i(3, 2))
+	_unhandled_input(ev)
+	if _build_menu == null or not _build_menu.visible:
+		ok = false
+		push_error("[Workbench] 点击工作台未打开建造菜单")
+	if _build_menu:
+		_build_menu.visible = false
+	print("=== 自动测试: 点击工作台打开建造菜单=", ok, " (应为 true)")
 
 
 ## 墙体阻挡回归: ①墙格 is_cell_walkable=false ②墙格物理尺寸 == tile_size (与主角格等大)
