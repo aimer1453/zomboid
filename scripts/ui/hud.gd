@@ -526,9 +526,11 @@ func _update_rest_buttons() -> void:
 	_train_btn.tooltip_text = "战斗中无法锻炼" if in_combat else ""
 
 
-## 新手引导提示 (顶部横幅, 可点击关闭)
+## 新手引导提示 (顶部横幅, 带跳过按钮; 横幅本体不拦截游戏点击)
 var _tutorial_banner: PanelContainer = null
 var _tutorial_label: Label = null
+## 玩家点击"跳过教程"时发出 (home_base 据此把教程状态机置为 done)
+signal tutorial_skipped()
 
 func show_tutorial(msg: String) -> void:
 	if _tutorial_banner == null:
@@ -546,8 +548,10 @@ func _build_tutorial_banner() -> void:
 	_tutorial_banner.offset_left = 40
 	_tutorial_banner.offset_right = -40
 	_tutorial_banner.offset_top = 100
-	_tutorial_banner.offset_bottom = 150
-	_tutorial_banner.mouse_filter = Control.MOUSE_FILTER_STOP
+	_tutorial_banner.offset_bottom = 156
+	# 关键: 横幅本体 MOUSE_FILTER_IGNORE — 纯提示, 不能拦截下方游戏点击
+	# (修复: STOP 横条挡中上部格子的家具/丧尸点击; 关闭/跳过走独立按钮)
+	_tutorial_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.1, 0.12, 0.2, 0.92)
@@ -556,25 +560,49 @@ func _build_tutorial_banner() -> void:
 	sb.set_corner_radius_all(10)
 	sb.content_margin_left = 16
 	sb.content_margin_right = 16
-	sb.content_margin_top = 10
-	sb.content_margin_bottom = 10
+	sb.content_margin_top = 8
+	sb.content_margin_bottom = 8
 	_tutorial_banner.add_theme_stylebox_override("panel", sb)
+
+	var hbox := HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 12)
+	_tutorial_banner.add_child(hbox)
 
 	_tutorial_label = Label.new()
 	_tutorial_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_tutorial_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_tutorial_label.add_theme_font_size_override("font_size", 17)
 	_tutorial_label.add_theme_color_override("font_color", Color(0.9, 0.92, 1.0))
-	_tutorial_banner.add_child(_tutorial_label)
+	_tutorial_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hbox.add_child(_tutorial_label)
 
-	# 点击横幅关闭
-	_tutorial_banner.gui_input.connect(_on_tutorial_banner_input)
+	# 跳过教程按钮 (独立小按钮, 默认 STOP — 只占按钮区域, 不挡游戏)
+	var skip := Button.new()
+	skip.name = "SkipTutorialBtn"
+	skip.text = "跳过教程"
+	skip.custom_minimum_size = Vector2(92, 32)
+	skip.add_theme_font_size_override("font_size", 14)
+	skip.pressed.connect(_on_tutorial_skip)
+	hbox.add_child(skip)
+
+	# 关闭按钮 (收起提示, 不结束教程状态)
+	var close := Button.new()
+	close.name = "TutorialCloseBtn"
+	close.text = "×"
+	close.custom_minimum_size = Vector2(32, 32)
+	close.add_theme_font_size_override("font_size", 16)
+	close.pressed.connect(hide_tutorial)
+	hbox.add_child(close)
+
 	add_child(_tutorial_banner)
 
 
-func _on_tutorial_banner_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed:
-		_tutorial_banner.visible = false
+## 跳过教程: 关闭横幅 + 结束教程状态 (home_base 收到信号后推进状态机到 done)
+func _on_tutorial_skip() -> void:
+	if GameManager and GameManager.has_method("set_tutorial_done"):
+		GameManager.set_tutorial_done()
+	hide_tutorial()
+	tutorial_skipped.emit()
 
 
 ## 隐藏引导 (可手动调用)

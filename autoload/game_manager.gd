@@ -114,6 +114,8 @@ var story_progress: int = 0
 var active_save_slot: int = -1
 ## 新手引导模式 (新游戏开局=家园醒来+引导; 通关引导后关闭)
 var _tutorial_active: bool = false
+## 教程是否曾完成 (跨会话, meta 持久化; 完成过 → 新游戏不再重复教学)
+var _tutorial_done_once: bool = false
 
 signal game_state_changed(new_state: GameState)
 signal character_switched(new_character: CharacterID)
@@ -133,6 +135,7 @@ func _ready() -> void:
 		var s: Dictionary = meta.get("stats", {})
 		if not s.is_empty():
 			stats = s
+	_tutorial_done_once = bool(meta.get("tutorial_done", false))
 	print("[GameManager] 初始化完成, 已解锁角色: ", unlocked_characters)
 	# 定时自动存档 (每 5 分钟), 仅在进行中(EXPLORING)时触发, 避免菜单/死亡界面误写档
 	var autosave_timer := Timer.new()
@@ -157,6 +160,13 @@ func is_tutorial_mode() -> bool:
 ## 新手引导完成 (家园场景调用, 之后新玩家出生带默认装备)
 func set_tutorial_done() -> void:
 	_tutorial_active = false
+	_tutorial_done_once = true
+	# 完成标志跨会话持久化: 老玩家新游戏不再重复教学。
+	# 自测(--auto-test)不写 meta, 避免污染用户档 (自测会反复完成教程)。
+	if "--auto-test" not in OS.get_cmdline_user_args():
+		var meta := DataManager.load_meta()
+		meta["tutorial_done"] = true
+		DataManager.save_meta(meta)
 	print("[GameManager] 新手引导完成")
 
 
@@ -191,7 +201,8 @@ func start_new_game(character: CharacterID) -> void:
 	if has_meta("home_return"):
 		remove_meta("home_return")
 	# 新游戏: 家园醒来 + 新手引导 (P1 开场流程)
-	_tutorial_active = true
+	# 从未完成过教程 → 开教程; 完成过 → 老玩家直接正常开局 (不再重复教学)
+	_tutorial_active = not _tutorial_done_once
 	change_state(GameState.EXPLORING)
 	if get_tree():
 		get_tree().call_deferred("change_scene_to_file", "res://scenes/home_base.tscn")

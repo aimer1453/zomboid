@@ -557,6 +557,15 @@ func _setup_tutorial_listeners() -> void:
 	# 打开容器(搜刮) → 推进引导
 	if not container_opened.is_connected(_on_container_opened):
 		container_opened.connect(_on_container_opened)
+	# 跳过教程按钮 → 教程状态机直接置 done
+	if _hud and _hud.has_signal("tutorial_skipped") and not _hud.tutorial_skipped.is_connected(_on_tutorial_skipped):
+		_hud.tutorial_skipped.connect(_on_tutorial_skipped)
+
+
+## 玩家点"跳过教程": 状态机直接到 done (GameManager.set_tutorial_done 已由 HUD 调用)
+func _on_tutorial_skipped() -> void:
+	_tutorial_step = "done"
+	_tutorial_step_completed("done")  # done 分支空操作, 保持状态一致
 
 
 func _on_player_equipped(_item_id: String, _slot: String) -> void:
@@ -1152,6 +1161,30 @@ func _test_tutorial_flow() -> void:
 	if GameManager:
 		GameManager.set_tutorial_for_test(true)
 	_reset_home_test_state()
+	# 0. 跳过教程链路: 横幅显示 + 跳过按钮 → 状态机置 done + 退出教程模式
+	var skip_ok := true
+	if _hud and _hud.has_method("show_tutorial"):
+		_hud.show_tutorial("新手教程（自测横幅）")
+	await get_tree().process_frame
+	var banner: Node = _hud.get("_tutorial_banner") if _hud else null
+	if banner == null or not banner.visible:
+		skip_ok = false
+		push_error("[Guide] 教程横幅未显示")
+	var skip_btn: Button = banner.find_child("SkipTutorialBtn", true, false) if banner else null
+	if skip_btn == null:
+		skip_ok = false
+		push_error("[Guide] 跳过教程按钮缺失")
+	else:
+		skip_btn.pressed.emit()
+		await get_tree().process_frame
+		if _tutorial_step != "done" or (GameManager and GameManager.is_tutorial_mode()):
+			skip_ok = false
+			push_error("[Guide] 跳过教程后状态错误: step=", _tutorial_step)
+	print("=== 引导测试: 跳过教程按钮=", skip_ok, " (应为 true)")
+	# 重新开启教程模式, 继续完整 5 步流程 (跳过测试把状态机置 done, 须重置回 wake_up)
+	if GameManager:
+		GameManager.set_tutorial_for_test(true)
+	_tutorial_step = "wake_up"
 	# 1. 装备武器 (触发 equipment_changed → 推进 equipped)
 	_player.add_item("baseball_bat", 1)
 	var equipped: bool = _player.equip_item("baseball_bat")
