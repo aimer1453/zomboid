@@ -112,6 +112,7 @@ func _ready() -> void:
 	_register_default_items()
 	_register_default_abilities()
 	_validate_data_consistency()
+	_validate_loot_tables()
 
 
 # --- 物品数据库 ---
@@ -141,6 +142,9 @@ func _register_default_items() -> void:
 		Vector2i(1,1), 5, "", {"energy_restore": 40}, Rarity.UNCOMMON))
 	_add_item(ItemData.new("energy_drink", "能量饮料", ItemType.CONSUMABLE, "回复少量精力",
 		Vector2i(1,1), 10, "", {"energy_restore": 20}, Rarity.COMMON))
+	# 止痛药: 中等恢复, 药柜高频掉落 (此前漏注册导致无法拾取)
+	_add_item(ItemData.new("painkiller", "止痛药", ItemType.CONSUMABLE, "强效镇痛, 恢复中等生命",
+		Vector2i(1,1), 10, "", {"heal": 30}, Rarity.UNCOMMON, 0.1))
 
 	# 饰品 (TRINKET): 提供视野/射程/命中/暴击/幸运加成 (durability=耐久, 磨损影响价值)
 	_add_item(ItemData.new("tactical_scope", "战术瞄准镜", ItemType.TRINKET, "提升视野范围和射击精度",
@@ -225,6 +229,19 @@ func _register_default_items() -> void:
 		Vector2i(1,1), 40, "", {}, Rarity.COMMON))
 	_add_item(ItemData.new("tool", "通用工具", ItemType.MATERIAL, "多功能维修工具, 拆解/修理/制作均可用",
 		Vector2i(1,1), 25, "", {}, Rarity.COMMON))
+
+	# 杂项战利品 (loot 表专用掉落, 此前均漏注册 → 拾取返回"未知物品"无法拿走, 已补)
+	_add_item(ItemData.new("book", "书籍", ItemType.MATERIAL, "旧世界书籍, 可交易或收藏",
+		Vector2i(1,1), 20, "", {}, Rarity.COMMON, 1.0))
+	_add_item(ItemData.new("document", "文件", ItemType.MATERIAL, "重要文件, 可能含旧世界情报",
+		Vector2i(1,1), 30, "", {}, Rarity.COMMON, 0.2))
+	_add_item(ItemData.new("battery", "电池", ItemType.MATERIAL, "电子设备能源, 维修/制作可用",
+		Vector2i(1,1), 20, "", {}, Rarity.UNCOMMON, 0.5))
+	_add_item(ItemData.new("cash", "现金", ItemType.MATERIAL, "旧世界钞票, 仍可作交易物",
+		Vector2i(1,1), 99, "", {}, Rarity.UNCOMMON, 0.1))
+	_add_item(ItemData.new("jewelry", "珠宝", ItemType.MATERIAL, "贵重珠宝, 高价值交易物",
+		Vector2i(1,1), 20, "", {}, Rarity.RARE, 0.3))
+
 	_add_item(ItemData.new("seed_vegetable", "蔬菜种子", ItemType.MATERIAL, "可在室内种植",
 		Vector2i(1,1), 20))
 	_add_item(ItemData.new("blueprint_purifier", "雨水净化器蓝图", ItemType.BLUEPRINT, "解锁雨水净化器",
@@ -268,6 +285,32 @@ func _validate_data_consistency() -> void:
 		push_error("[DataManager] 请同步 物品表(data_manager.gd) 与 武器工厂(weapon.gd) 的 weapon_id!")
 	else:
 		print("[DataManager] 数据一致性校验通过: ", all_weapons.size(), " 把武器双向映射完整")
+
+
+## 战利品表孤儿校验 (P0-2: 防 loot 引用未注册物品导致"无法拾取")
+## 扫描 dungeon_base 的 LOOT_BY_FURNITURE / LOOT_WEIGHTED 与 enemy_base 的 LOOT_LOW_GEAR,
+## 任一 id 不在物品表里即 push_error, 让"改了 loot 忘注册"在启动时就暴露, 而非进游戏才发现拿不走.
+func _validate_loot_tables() -> void:
+	var orphans: Array = []
+	var db_script: Script = load("res://scripts/dungeons/dungeon_base.gd")
+	if db_script:
+		for table_name in ["LOOT_BY_FURNITURE", "LOOT_WEIGHTED"]:
+			if table_name in db_script:
+				var table: Dictionary = db_script.get(table_name)
+				for key in table:
+					for row in table[key]:
+						var id: String = row.get("id", "")
+						if id != "" and not _items.has(id):
+							orphans.append(id)
+	var eb_script: Script = load("res://scripts/units/enemy_base.gd")
+	if eb_script and "LOOT_LOW_GEAR" in eb_script:
+		for id in eb_script.LOOT_LOW_GEAR:
+			if not _items.has(id):
+				orphans.append(id)
+	if not orphans.is_empty():
+		push_error("[DataManager] 战利品表引用了未注册物品(将导致无法拾取): ", orphans)
+	else:
+		print("[DataManager] 战利品表孤儿校验通过: 无悬空物品引用")
 
 
 func get_item(id: String) -> ItemData:
