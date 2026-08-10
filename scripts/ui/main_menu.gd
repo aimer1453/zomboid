@@ -222,7 +222,7 @@ func _build_select_ui(root: Control) -> void:
 	var list := VBoxContainer.new()
 	list.add_theme_constant_override("separation", 8)
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	# 列表自然高度 (5×80+间距), 剩余空间全给详情区
 	cvbox.add_child(list)
 	for i in CHAR_ORDER.size():
 		var id: int = CHAR_ORDER[i]
@@ -230,42 +230,43 @@ func _build_select_ui(root: Control) -> void:
 		_rows[id] = row
 		list.add_child(row)
 
-	# 详情区
+	# 详情区: 撑满列表下方剩余空间 (覆盖下面大部分区域), 字号加大
 	var detail := PanelContainer.new()
 	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	detail.custom_minimum_size = Vector2(0, 220)
-	detail.add_theme_stylebox_override("panel", UiStyle.light_panel(14, 12))
+	detail.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	detail.custom_minimum_size = Vector2(0, 260)
+	detail.add_theme_stylebox_override("panel", UiStyle.light_panel(14, 16))
 	cvbox.add_child(detail)
 
 	var dv := VBoxContainer.new()
-	dv.add_theme_constant_override("separation", 4)
+	dv.add_theme_constant_override("separation", 8)
 	dv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	detail.add_child(dv)
 
 	_detail_title = Label.new()
-	_detail_title.add_theme_font_size_override("font_size", 16)
+	_detail_title.add_theme_font_size_override("font_size", 26)
 	_detail_title.add_theme_color_override("font_color", Palette.DARK)
 	dv.add_child(_detail_title)
 
 	_detail_series = Label.new()
-	_detail_series.add_theme_font_size_override("font_size", 12)
+	_detail_series.add_theme_font_size_override("font_size", 16)
 	_detail_series.add_theme_color_override("font_color", Palette.TEXT_SECONDARY)
 	dv.add_child(_detail_series)
 
 	_detail_bg = Label.new()
 	_detail_bg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_detail_bg.add_theme_font_size_override("font_size", 11)
-	_detail_bg.add_theme_color_override("font_color", Color(0.30, 0.34, 0.42))
+	_detail_bg.add_theme_font_size_override("font_size", 15)
+	_detail_bg.add_theme_color_override("font_color", Color(0.28, 0.32, 0.40))
 	dv.add_child(_detail_bg)
 
 	var qlabel := Label.new()
 	qlabel.text = "主线任务"
-	qlabel.add_theme_font_size_override("font_size", 12)
+	qlabel.add_theme_font_size_override("font_size", 16)
 	qlabel.add_theme_color_override("font_color", Palette.TEXT_SECONDARY)
 	dv.add_child(qlabel)
 
 	_detail_quest = VBoxContainer.new()
-	_detail_quest.add_theme_constant_override("separation", 2)
+	_detail_quest.add_theme_constant_override("separation", 4)
 	_detail_quest.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dv.add_child(_detail_quest)
 
@@ -470,12 +471,12 @@ func _select(id: int) -> void:
 	for c in _detail_quest.get_children():
 		c.queue_free()
 	var steps: Array = GameManager.get_character_quest(id)
-	for i in mini(steps.size(), 3):
+	for i in mini(steps.size(), 4):
 		var s := Label.new()
 		s.text = "•  " + str(steps[i])
 		s.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		s.add_theme_font_size_override("font_size", 11)
-		s.add_theme_color_override("font_color", Color(0.30, 0.34, 0.42))
+		s.add_theme_font_size_override("font_size", 14)
+		s.add_theme_color_override("font_color", Color(0.28, 0.32, 0.40))
 		s.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_detail_quest.add_child(s)
 	_fab.disabled = not GameManager.is_character_unlocked(id)
