@@ -107,9 +107,9 @@ func _build_ui() -> void:
 	_select_root = Control.new()
 	_select_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_select_root.visible = false  # home 态不可见 → 完全不参与鼠标拾取
-	_select_root.modulate.a = 0.0
+	_select_root.modulate.a = 1.0
 	_select_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_select_root.position.y = 140
+	_select_root.position.y = 180  # 初始在屏外下方, 动画从这上移到 0
 	add_child(_select_root)
 
 	_build_select_ui(_select_root)
@@ -286,16 +286,16 @@ func _build_select_ui(root: Control) -> void:
 	_select(GameManager.CharacterID.SPECIAL_FORCE)
 
 
-## 主页面 → 选择: 标题平移缩小到左上, 卡片上滑入场, 继续游戏隐藏, 返回按钮出现
+## 主页面 → 选择: 标题平移缩小到左上, 蓝色 header + 白色卡片从底部上移入场 (纯滑入无淡入),
+##                 继续游戏隐藏, 返回按钮出现
 func _transition_select() -> void:
 	if _state == "select":
 		return
 	_state = "select"
-	# select_root 用 visible 控制拾取: 先显示(modulate 0 透明), 动画淡入
-	# (visible=false 的 Control 不参与鼠标拾取 — 根治 home 态透明子节点拦截点击)
+	# select_root 从屏外下方 (y=180) 整体上移到位 — 无淡入, 纯滑入
 	_select_root.visible = true
-	_select_root.modulate.a = 0.0
-	_select_root.position.y = 140.0
+	_select_root.modulate.a = 1.0
+	_select_root.position.y = 180.0
 	_title.pivot_offset = _title.size / 2.0
 	var tw := create_tween()
 	tw.set_parallel(true)
@@ -304,8 +304,8 @@ func _transition_select() -> void:
 	tw.tween_property(_title, "scale", Vector2(TITLE_SELECT_SCALE, TITLE_SELECT_SCALE), 0.42) \
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 	tw.tween_property(_home_btns, "modulate:a", 0.0, 0.28)
-	tw.tween_property(_select_root, "modulate:a", 1.0, 0.4)
-	tw.tween_property(_select_root, "position:y", 0.0, 0.45) \
+	# select_root (含 header 蓝头 + 白色卡) 从屏外下方上移到位
+	tw.tween_property(_select_root, "position:y", 0.0, 0.5) \
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tw.tween_property(_back_btn, "modulate:a", 1.0, 0.3)
 	tw.chain().tween_callback(func() -> void:
@@ -313,7 +313,7 @@ func _transition_select() -> void:
 		_back_btn.mouse_filter = Control.MOUSE_FILTER_STOP)
 
 
-## 选择 → 主页面 (返回)
+## 选择 → 主页面 (返回) — select_root 滑出屏外下方 (无淡出)
 func _transition_home() -> void:
 	if _state == "home":
 		return
@@ -328,8 +328,7 @@ func _transition_home() -> void:
 	tw.tween_property(_title, "scale", Vector2.ONE, 0.42) \
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 	tw.tween_property(_home_btns, "modulate:a", 1.0, 0.3)
-	tw.tween_property(_select_root, "modulate:a", 0.0, 0.35)
-	tw.tween_property(_select_root, "position:y", 140.0, 0.4) \
+	tw.tween_property(_select_root, "position:y", 180.0, 0.45) \
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
 	tw.tween_property(_back_btn, "modulate:a", 0.0, 0.2)
 	tw.chain().tween_callback(func() -> void:
