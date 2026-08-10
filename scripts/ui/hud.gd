@@ -117,21 +117,12 @@ class InvSlot extends PanelContainer:
 			count_l.add_theme_font_size_override("font_size", 12)
 			vbox.add_child(count_l)
 
-			# 废料档: 加一个小角标, 与边框一起凸显"低档"
-			if is_trash:
-				var tag_l := Label.new()
-				tag_l.text = "废料"
-				tag_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-				tag_l.add_theme_font_size_override("font_size", 9)
-				tag_l.add_theme_color_override("font_color", Color(0.7, 0.7, 0.75))
-				vbox.add_child(tag_l)
-
 			add_child(vbox)
 			var rarity_name: String = DataManager.RARITY_NAMES.get(int(info.get("rarity", 0)), "普通") if DataManager else "普通"
 			tooltip_text = "%s  [%s]  重量%.1f千克  售价%d\n%s" % [
 				info.get("name", ""), rarity_name, float(info.get("unit_weight", 0)), int(info.get("value", 0)),
 				info.get("description", "")] + ("\n（可拖到上方装备栏穿戴）" if info.get("equippable", false) else "")
-		add_theme_stylebox_override("panel", cell_style)
+			add_theme_stylebox_override("panel", cell_style)
 
 
 # --- 内部类: 装备槽 (接受拖放, 点击卸下) ---

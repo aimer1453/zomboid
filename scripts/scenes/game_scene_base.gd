@@ -137,7 +137,7 @@ func _init_fog_of_war() -> void:
 	var tm: Node = _tilemap
 	if tm == null:
 		for ch in get_children():
-			if ch is DrawTileMap:
+			if ch is DTM:
 				tm = ch
 				break
 	_fog.setup(tm, tile_size)

@@ -17,7 +17,6 @@ const CELL := 60
 
 var _cell_layer: Control = null
 var _info_label: Label = null
-var _home_btn: Button = null
 
 func _ready() -> void:
 	_setup_cell_layer()
@@ -43,6 +42,18 @@ func _window_origin() -> Vector2:
 	return Vector2(x, y)
 
 
+## 把中文文本按 per 个字插入换行, 让长标签在窄格内 2~3 字一行并居中
+func _wrap_cjk(t: String, per: int = 3) -> String:
+	if t.length() <= per:
+		return t
+	var out: String = ""
+	for i in range(t.length()):
+		if i > 0 and i % per == 0:
+			out += "\n"
+		out += t[i]
+	return out
+
+
 func _build_ui() -> void:
 	var title := Label.new()
 	title.text = "世界地图 — 点击相邻地点前进，走到新地点自动生成四周"
@@ -52,13 +63,6 @@ func _build_ui() -> void:
 	title.size = Vector2(720, 36)
 	title.add_theme_color_override("font_color", Color(0.92, 0.93, 0.88))
 	add_child(title)
-
-	_home_btn = Button.new()
-	_home_btn.text = "返回家园"
-	_home_btn.position = Vector2(560, 80)
-	_home_btn.size = Vector2(140, 42)
-	_home_btn.pressed.connect(_on_home_pressed)
-	add_child(_home_btn)
 
 	_info_label = Label.new()
 	_info_label.add_theme_font_size_override("font_size", 14)
@@ -143,9 +147,12 @@ func _build_cell(wx: int, wy: int, screen: Vector2) -> void:
 	if WorldMapData.has_last_entry and Vector2i(wx, wy) == WorldMapData.last_entry_cell \
 			and Vector2i(wx, wy) != WorldMapData.player_cell:
 		var here := Label.new()
-		here.text = "出口"
+		here.text = _wrap_cjk("出口", 3)
 		here.add_theme_font_size_override("font_size", 12)
-		here.position = screen + Vector2(2, CELL - 16)
+		here.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		here.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		here.position = screen
+		here.size = Vector2(CELL, CELL)
 		here.add_theme_color_override("font_color", Color(0.6, 1.0, 0.7))
 		here.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_cell_layer.add_child(here)
@@ -158,10 +165,6 @@ func _update_info() -> void:
 	var t: int = WorldMapData.terrain_at(pc.x, pc.y)
 	var name: String = WorldMapData.terrain_name(t)
 	_info_label.text = "当前位置: %s (%d, %d)　|　点击相邻已揭示的地点前进" % [name, pc.x, pc.y]
-
-
-func _on_home_pressed() -> void:
-	WorldMapData.enter_home()
 
 
 func _input(event) -> void:

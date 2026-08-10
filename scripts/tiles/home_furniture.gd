@@ -54,15 +54,14 @@ func _build_visual() -> void:
 
 	# 家具名标签: 居中在主体中心 (用户反馈: 像尸体一样标注是什么家具)
 	var label := Label.new()
-	label.text = furniture_name
+	label.text = _wrap_cjk(furniture_name, 3)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.add_theme_font_size_override("font_size", 9)
 	label.add_theme_color_override("font_color", Color(1.0, 0.95, 0.8))
-	# 锚点居中 → 文字真正居中 (用户反馈: 雨水收集器/健身器材名字偏移)
-	label.set_anchors_preset(Control.PRESET_CENTER)
-	label.size = rect.size
 	label.position = rect.position
+	label.size = rect.size
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(label)
 
 	# 状态标签 (收集器存量/种植进度): 主体下方
@@ -73,6 +72,18 @@ func _build_visual() -> void:
 	state.add_theme_color_override("font_color", Color(0.9, 0.9, 0.95))
 	state.position = Vector2(-_tile_size * 0.7, _tile_size * 0.5)
 	add_child(state)
+
+
+## 把中文文本按 per 个字插入换行, 让长标签在窄格内 2~3 字一行并居中
+func _wrap_cjk(t: String, per: int = 3) -> String:
+	if t.length() <= per:
+		return t
+	var out: String = ""
+	for i in range(t.length()):
+		if i > 0 and i % per == 0:
+			out += "\n"
+		out += t[i]
+	return out
 
 
 func _kind_color() -> Color:

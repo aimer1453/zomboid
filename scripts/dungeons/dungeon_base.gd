@@ -152,13 +152,28 @@ func draw_current_floor() -> void:
 ## 在 tilemap 上贴格子文字标签 (tilemap 释放时标签一并释放, 不残留)
 func _add_tile_label(cell: Vector2i, text: String, col: Color) -> void:
 	var lbl := Label.new()
-	lbl.text = text
-	lbl.add_theme_font_size_override("font_size", 11)
+	lbl.text = _wrap_cjk(text, 3)
+	lbl.add_theme_font_size_override("font_size", 12)
 	lbl.add_theme_color_override("font_color", col)
-	lbl.position = Vector2(cell.x * tile_size + 2, cell.y * tile_size - 13)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.position = Vector2(cell.x * tile_size, cell.y * tile_size)
+	lbl.size = Vector2(tile_size, tile_size)
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lbl.z_index = 6
 	_tilemap.add_child(lbl)
+
+
+## 把中文文本按 per 个字插入换行, 让长标签在窄格内 2~3 字一行并居中
+func _wrap_cjk(t: String, per: int = 3) -> String:
+	if t.length() <= per:
+		return t
+	var out: String = ""
+	for i in range(t.length()):
+		if i > 0 and i % per == 0:
+			out += "\n"
+		out += t[i]
+	return out
 
 
 ## 楼层 HUD (屏幕固定, 不随相机移动)

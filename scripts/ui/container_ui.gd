@@ -222,8 +222,6 @@ func _make_item_cell(info: Dictionary) -> Control:
 	btn.text = "%s" % name
 	if name.length() > 5:
 		btn.text = name.substr(0, 5) + "…"
-	if is_trash:
-		btn.text += "·废料"
 
 	# 左键点击 → 弹操作菜单 (与点击丧尸弹动作菜单同一模式)
 	btn.pressed.connect(_on_cell_pressed.bind(item_id, btn))
