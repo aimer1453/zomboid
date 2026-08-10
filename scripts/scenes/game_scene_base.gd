@@ -308,6 +308,9 @@ func _cell_has_ground_item(cell: Vector2i) -> bool:
 			return true
 	return false
 
+## 玩家打开任意容器(尸体/衣柜/箱子/货架等)时发出 — 教程"搜刮"步骤据此推进
+signal container_opened(container: Node)
+
 ## 通用交互物行为: 地面物品 → 拾取; 可搜刮物(家具/尸体) → 打开容器 UI
 ## (修复: 之前是空实现, 主地图/测试场景点尸体无反应; 子类可覆写扩展)
 func _on_interact(interact: Node) -> void:
@@ -327,6 +330,7 @@ func _on_interact(interact: Node) -> void:
 			return
 		var name_str: String = interact.get("furniture_name") if interact.get("furniture_name") != null else interact.name
 		_container_ui.open(interact, name_str)
+		container_opened.emit(interact)
 
 
 ## 玩家是否可搜刮/开柜: 默认须距离容器切比雪夫 ≤1 格 (同格或八方相邻);
@@ -375,6 +379,7 @@ func _on_player_move_completed() -> void:
 		if _container_ui and container.has_method("list_inventory"):
 			var name_str: String = container.get("furniture_name") if container.get("furniture_name") != null else container.name
 			_container_ui.open(container, name_str)
+			container_opened.emit(container)
 			print("[场景] 到达容器旁, 自动打开背包: ", name_str)
 
 

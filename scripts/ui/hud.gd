@@ -267,6 +267,8 @@ func _ready() -> void:
 	TurnManager.unit_action_executed.connect(_on_unit_action_log)
 	if WorldTime:
 		WorldTime.time_changed.connect(_on_world_time_changed)
+		WorldTime.weather_changed.connect(_on_weather_changed)
+		_on_weather_changed(WorldTime.current_weather)
 	_connect_player_signals()
 
 
@@ -276,6 +278,16 @@ func _on_world_time_changed(day_num: int, hour_val: float) -> void:
 		var hh: int = int(hour_val)
 		var mm: int = int((hour_val - hh) * 60)
 		_time_label.text = "Day %d  %02d:%02d" % [day_num, hh, mm]
+
+
+## 天气 → 状态栏 (每天轮换, 关联雨水收集器)
+func _on_weather_changed(w: int) -> void:
+	if _weather_label:
+		var name: String = WEATHER_NAMES.get(w, "—")
+		var rain := (w == WorldTime.Weather.RAIN or w == WorldTime.Weather.HEAVY_RAIN or w == WorldTime.Weather.STORM)
+		_weather_label.text = name + (" (收集雨水)" if rain else "")
+		_weather_label.add_theme_color_override("font_color",
+			Color(0.6, 0.75, 1.0) if rain else Color(0.9, 0.9, 0.7))
 
 
 ## 连接玩家状态信号 (HP/AP/生存属性 → 状态栏)
@@ -305,6 +317,15 @@ var _hunger_bar: ProgressBar = null
 var _thirst_bar: ProgressBar = null
 var _sleep_bar: ProgressBar = null
 var _time_label: Label = null
+var _weather_label: Label = null
+
+const WEATHER_NAMES := {
+	0: "晴",
+	1: "多云",
+	2: "雨",
+	3: "大雨",
+	4: "暴风雨",
+}
 
 
 func _build_status_bar() -> void:
@@ -372,6 +393,22 @@ func _build_status_bar() -> void:
 	row2.add_child(_time_label)
 
 	bar_root.add_child(row2)
+
+	# 第三行: 天气 (每天轮换, 关联雨水收集器)
+	var row3 := HBoxContainer.new()
+	row3.add_theme_constant_override("separation", 6)
+	var wlabel := Label.new()
+	wlabel.text = "天气"
+	wlabel.add_theme_font_size_override("font_size", 12)
+	wlabel.add_theme_color_override("font_color", Color(0.7, 0.85, 1.0))
+	row3.add_child(wlabel)
+	_weather_label = Label.new()
+	_weather_label.text = "—"
+	_weather_label.add_theme_font_size_override("font_size", 12)
+	_weather_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.7))
+	row3.add_child(_weather_label)
+	bar_root.add_child(row3)
+
 	add_child(bar_root)
 
 	# 战斗日志下移, 避开状态栏

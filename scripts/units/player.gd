@@ -50,8 +50,13 @@ func _ready() -> void:
 	attack_power = 22.0
 	defense = 5.0
 	super._ready()
-	# 新手引导模式: 空手开局 (从衣柜拿棒球棍再装备); 非引导模式: 默认手枪
-	if GameManager and not GameManager.is_tutorial_mode():
+	# 新手引导模式: 给基础武器 + 建造材料 (教程教"装备武器"与"建造床/箱子"); 非引导模式: 默认手枪
+	if GameManager and GameManager.is_tutorial_mode():
+		add_item("baseball_bat", 1)
+		add_item("wood", 10)
+		add_item("nail", 4)
+		add_item("cloth", 4)
+	else:
 		equip_weapon(WD.create_pistol())
 		add_item("crystal_shard", 3)
 		add_item("bread", 2)

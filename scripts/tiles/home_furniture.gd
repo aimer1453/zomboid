@@ -8,7 +8,7 @@ extends Node2D
 # 由 home_base 场景生成并注册到交互列表, 场景 _on_interact 按 kind 分发。
 
 ## 家具类型
-enum Kind { BED, RAIN_COLLECTOR, PURIFIER, PLANTING_BED, WORKBENCH, GYM }
+enum Kind { BED, RAIN_COLLECTOR, PURIFIER, PLANTING_BED, WORKBENCH, GYM, CHEST }
 
 ## 家具类型 → 名称
 const KIND_NAMES := {
@@ -18,6 +18,7 @@ const KIND_NAMES := {
 	Kind.PLANTING_BED: "室内种植区",
 	Kind.WORKBENCH: "工作台",
 	Kind.GYM: "健身器材",
+	Kind.CHEST: "储物箱",
 }
 
 var kind: Kind = Kind.WORKBENCH
@@ -94,6 +95,7 @@ func _kind_color() -> Color:
 		Kind.PLANTING_BED: return Color(0.4, 0.6, 0.3)
 		Kind.WORKBENCH: return Color(0.6, 0.5, 0.3)
 		Kind.GYM: return Color(0.55, 0.45, 0.25)
+		Kind.CHEST: return Color(0.62, 0.52, 0.32)
 	return Color(0.5, 0.5, 0.5)
 
 

@@ -21,6 +21,12 @@ const BLUEPRINTS := {
 		"research": {},
 		"preknown": true,
 	},
+	HF.Kind.CHEST: {
+		"name": "储物箱",
+		"desc": "存放物品的容器 (可建造, 点击打开存取)",
+		"build": {"wood": 3, "nail": 2},
+		"research": {"wood": 1, "nail": 1},
+	},
 	HF.Kind.BED: {
 		"name": "床",
 		"desc": "休息恢复精力与生命 (可升级)",

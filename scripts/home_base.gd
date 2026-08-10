@@ -160,60 +160,14 @@ func _create_player() -> void:
 # --- 敌人 + 家具 ---
 
 func _spawn_entities() -> void:
-	_spawn_chest()
 	_spawn_home_furniture()
 	_spawn_garden_zombie()
 	_refresh_move_grid()
 
 
-## 衣柜: 固定放棒球棍 (新手引导: 拿走→装备→打丧尸)
-func _spawn_chest() -> void:
-	var chest := FUR.new()
-	chest.setup(CHEST_CELL, tile_size, ["baseball_bat"], 1, "衣柜")
-	chest.furniture_name = "衣柜"
-	add_child(chest)
-	_furniture_list.append(chest)
-	print("[HomeBase] 衣柜生成 (含棒球棍) at ", CHEST_CELL)
-
-
-## 家园功能家具: 床/净化器/雨水收集器/种植区 (Phase 6)
+## 家园功能家具: 初始只预置工作台; 其余(床/收集器/净化器/种植区/储物箱等)
+## 由玩家在工作台研究蓝图并建造 (新手教程会引导建造床与储物箱)
 func _spawn_home_furniture() -> void:
-	# 床 (房间右上)
-	var bed := HF.new()
-	bed.setup(HF.Kind.BED, BED_CELL, tile_size)
-	add_child(bed)
-	_home_furniture[HF.Kind.BED] = bed
-	_furniture_list.append(bed)
-
-	# 雨水净化器 (房间左下; 需蓝图解锁, 新玩家直接解锁以便体验流程)
-	var purifier := HF.new()
-	purifier.setup(HF.Kind.PURIFIER, PURIFIER_CELL, tile_size)
-	add_child(purifier)
-	_home_furniture[HF.Kind.PURIFIER] = purifier
-	_furniture_list.append(purifier)
-
-	# 雨水收集器 (花园, 露天才下雨)
-	var collector := HF.new()
-	collector.setup(HF.Kind.RAIN_COLLECTOR, COLLECTOR_CELL, tile_size)
-	collector.capacity = 6
-	add_child(collector)
-	_home_furniture[HF.Kind.RAIN_COLLECTOR] = collector
-	_furniture_list.append(collector)
-
-	# 室内种植区 (花园)
-	var planting := HF.new()
-	planting.setup(HF.Kind.PLANTING_BED, PLANTING_CELL, tile_size)
-	add_child(planting)
-	_home_furniture[HF.Kind.PLANTING_BED] = planting
-	_furniture_list.append(planting)
-
-	# 健身器材 (房间内, 点击锻炼 +体力 消耗世界时间)
-	var gym := HF.new()
-	gym.setup(HF.Kind.GYM, GYM_CELL, tile_size)
-	add_child(gym)
-	_home_furniture[HF.Kind.GYM] = gym
-	_furniture_list.append(gym)
-
 	# 工作台 (固定, 点击打开建造/研究面板; 玩家从此研究蓝图并建造家具)
 	var workbench := HF.new()
 	workbench.setup(HF.Kind.WORKBENCH, Vector2i(3, 2), tile_size)
@@ -221,7 +175,7 @@ func _spawn_home_furniture() -> void:
 	_home_furniture[HF.Kind.WORKBENCH] = workbench
 	_furniture_list.append(workbench)
 
-	print("[HomeBase] 家园家具就绪: 床/净化器/收集器/种植区/健身/工作台")
+	print("[HomeBase] 初始家园: 仅工作台 (其余家具需玩家建造)")
 
 
 ## 家具网格命中: 容器家具 + 功能家具 (基类 _raycast_interactable 只查尸体)
@@ -236,16 +190,12 @@ func _raycast_interactable(world_pos: Vector2) -> Node:
 	return super._raycast_interactable(world_pos)
 
 
-## 点击家具: 容器家具(衣柜)走基类; 功能家具按类型分发
+## 点击家具: 功能家具(HomeFurniture)按类型分发; 容器家具(储物箱/尸体等)走基类
 func _on_interact(interact: Node) -> void:
-	# 功能家具
 	if interact is HF:
 		_handle_home_furniture(interact)
 		return
-	# 容器家具 (衣柜)
 	super._on_interact(interact)
-	if _furniture_list.size() > 0 and interact == _furniture_list[0]:
-		_tutorial_step_completed("chest_opened")
 
 
 ## 功能家具交互分发
@@ -255,7 +205,10 @@ func _handle_home_furniture(f: HF) -> void:
 			# 床: 左键睡觉, 右键升级 (右键标记在 _input 里设置)
 			if _last_right_click_on_furniture:
 				_last_right_click_on_furniture = false
-				_show_result(f.upgrade_bed())
+				var r_up: Dictionary = f.upgrade_bed()
+				_show_result(r_up)
+				if r_up.get("success", false) and GameManager and GameManager.is_tutorial_mode() and _tutorial_step == "upgrade":
+					_tutorial_step_completed("upgraded")
 			else:
 				_show_result(f.sleep_on_bed(_player))
 		HF.Kind.RAIN_COLLECTOR:
@@ -377,11 +330,22 @@ func _try_build_at(world_pos: Vector2) -> void:
 
 ## 生成一件已建家具节点 (注册到交互列表)
 func _spawn_built_furniture(kind: int, cell: Vector2i) -> void:
+	if kind == HF.Kind.CHEST:
+		# 储物箱: 用通用容器家具 (Furniture) 实现, 复用 ContainerUI 存取物品
+		var fur: Node = FUR.new()
+		fur.setup(cell, tile_size, [], 0, "储物箱", Furniture.FurnType.CRATE)
+		add_child(fur)
+		_furniture_list.append(fur)
+		_check_tutorial_build()
+		return
 	var f := HF.new()
 	f.setup(kind, cell, tile_size)
+	if kind == HF.Kind.RAIN_COLLECTOR:
+		f.capacity = 6  # 收集器容量 (建造版也需设定)
 	add_child(f)
 	_home_furniture[kind] = f
 	_furniture_list.append(f)
+	_check_tutorial_build()
 
 
 ## 读档: 从 BuildingManager 恢复所有已建家具
@@ -539,22 +503,37 @@ func _random_garden_cell(exclude: Array[Vector2i]) -> Vector2i:
 	return available[randi() % available.size()]
 
 
-# --- 新手引导 (简易) ---
+# --- 新手引导 (4 步: 装备武器 → 攻击/战斗 → 搜刮 → 建造 → 升级) ---
 
 var _tutorial_step: String = "wake_up"
 
 
-## 引导步骤推进 (由 HUD 或场景内触发)
+## 引导步骤推进
 func _tutorial_step_completed(step: String) -> void:
-	if _tutorial_step == "wake_up" and step == "chest_opened":
-		_tutorial_step = "equip_bat"
-		_show_tutorial_hint("获得棒球棍! 打开背包, 点击棒球棍穿戴到武器槽")
-	elif _tutorial_step == "equip_bat" and step == "equipped":
-		_tutorial_step = "kill_zombie"
-		_show_tutorial_hint("穿过花园的门, 用棒球棍消灭初级丧尸")
-	elif _tutorial_step == "kill_zombie" and step == "zombie_killed":
-		_tutorial_step = "done"
-		_show_tutorial_hint("新手教程完成! 现在可以自由探索了")
+	match _tutorial_step:
+		"wake_up":
+			if step == "equipped":
+				_set_tut("attack", "走到花园，点击丧尸发起攻击，进入战斗")
+		"attack":
+			if step == "combat_started":
+				_set_tut("loot", "进入战斗！消灭丧尸后，点击它的尸体搜刮战利品")
+		"loot":
+			if step == "looted":
+				_set_tut("build", "打开工作台，研究并建造床和储物箱（消耗材料）")
+		"build":
+			if step == "built":
+				_set_tut("upgrade", "右键点击床进行升级，提升休息恢复效果")
+		"upgrade":
+			if step == "upgraded":
+				_set_tut("done", "新手教程完成！自由探索、建造你的家园吧")
+		"done":
+			pass
+
+
+func _set_tut(step: String, hint: String) -> void:
+	_tutorial_step = step
+	_show_tutorial_hint(hint)
+	if step == "done" and GameManager and GameManager.has_method("set_tutorial_done"):
 		GameManager.set_tutorial_done()
 
 
@@ -572,21 +551,77 @@ func _setup_tutorial_listeners() -> void:
 	# 装备武器 → 推进引导
 	if _player.has_signal("equipment_changed"):
 		_player.equipment_changed.connect(_on_player_equipped)
-	# 丧尸死亡 → 推进引导
-	for enemy in TurnManager.get_enemy_units():
-		if enemy.has_signal("enemy_died"):
-			enemy.enemy_died.connect(_on_garden_zombie_died)
+	# 进入战斗 → 推进引导
+	if TurnManager.has_signal("combat_started") and not TurnManager.combat_started.is_connected(_on_combat_started):
+		TurnManager.combat_started.connect(_on_combat_started)
+	# 打开容器(搜刮) → 推进引导
+	if not container_opened.is_connected(_on_container_opened):
+		container_opened.connect(_on_container_opened)
 
 
-func _on_player_equipped(item_id: String, _slot: String) -> void:
-	if GameManager and GameManager.is_tutorial_mode():
-		if item_id == "baseball_bat":
-			_tutorial_step_completed("equipped")
+func _on_player_equipped(_item_id: String, _slot: String) -> void:
+	if not GameManager or not GameManager.is_tutorial_mode():
+		return
+	if _player and _player.get("equipped_weapon") != null:
+		_tutorial_step_completed("equipped")
 
 
-func _on_garden_zombie_died(_enemy: Node) -> void:
-	if GameManager and GameManager.is_tutorial_mode():
-		_tutorial_step_completed("zombie_killed")
+func _on_combat_started() -> void:
+	if not GameManager or not GameManager.is_tutorial_mode():
+		return
+	_tutorial_step_completed("combat_started")
+
+
+func _on_container_opened(_container: Node) -> void:
+	if not GameManager or not GameManager.is_tutorial_mode():
+		return
+	_tutorial_step_completed("looted")
+
+
+## 建造床+储物箱后推进"建造"步骤 (教程)
+func _check_tutorial_build() -> void:
+	if not GameManager or not GameManager.is_tutorial_mode():
+		return
+	if _tutorial_step != "build":
+		return
+	var has_bed := false
+	var has_chest := false
+	for b in BuildingManager.built:
+		var k: int = int(b.get("kind", -1))
+		if k == HF.Kind.BED:
+			has_bed = true
+		elif k == HF.Kind.CHEST:
+			has_chest = true
+	if has_bed and has_chest:
+		_tutorial_step_completed("built")
+
+
+# --- 天气视觉: 下雨时家园叠加冷色滤镜 (天气每天轮换, 关联雨水收集器) ---
+
+var _weather_tint: CanvasLayer = null
+
+
+func _setup_weather_tint() -> void:
+	if _weather_tint != null:
+		return
+	var layer := CanvasLayer.new()
+	layer.layer = 5
+	var cr := ColorRect.new()
+	cr.color = Color(0.45, 0.55, 0.75, 0.16)
+	cr.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	cr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(cr)
+	add_child(layer)
+	_weather_tint = layer
+	_update_weather_tint()
+	if WorldTime and WorldTime.has_signal("weather_changed") and not WorldTime.weather_changed.is_connected(_update_weather_tint):
+		WorldTime.weather_changed.connect(_update_weather_tint)
+
+
+func _update_weather_tint(_w: int = -1) -> void:
+	if _weather_tint == null:
+		return
+	_weather_tint.visible = WorldTime != null and WorldTime.is_raining()
 
 
 # --- 自动测试钩子 ---
@@ -594,10 +629,11 @@ func _on_garden_zombie_died(_enemy: Node) -> void:
 func _on_scene_ready() -> void:
 	super._on_scene_ready()  # 通用截图钩子 (--screenshot)
 	_setup_tutorial_listeners()
+	_setup_weather_tint()
 	_setup_survival_links()
-	# 新手引导: 开场提示拿棒球棍
+	# 新手引导: 开场提示
 	if GameManager and GameManager.is_tutorial_mode():
-		_show_tutorial_hint("醒来第一件事: 打开房间里的衣柜, 拿走棒球棍")
+		_show_tutorial_hint("你在家园废墟中醒来。打开背包，把木棒装备到武器槽；然后走到花园点击丧尸发起攻击")
 	_setup_build_menu()
 	if "--auto-test" in OS.get_cmdline_user_args():
 		_run_auto_test_sync()
@@ -739,13 +775,10 @@ func _test_movement_routing() -> void:
 ## 帧等待: detached 协程里 create_timer 信号不可靠, 用单次 process_frame 等待 (已验证稳定)
 func _run_auto_test() -> void:
 	await get_tree().process_frame
-	print("=== 家园自动测试: 玩家出生 + 衣柜 + 丧尸 ===")
-	print("=== 玩家位置=", _player.global_position, " 衣柜数=", _furniture_list.size(), " 敌人数=", TurnManager.get_enemy_units().size())
-	# 打开衣柜验证棒球棍
-	var chest: Node = _furniture_list[0]
-	var items: Array = chest.list_inventory()
-	print("=== 衣柜内容=", items)
-	print("=== 家园自动测试完成 ===")
+	print("=== 家园自动测试: 玩家出生 + 工作台 + 丧尸 ===")
+	var wb: HF = _home_furniture.get(HF.Kind.WORKBENCH)
+	print("=== 玩家位置=", _player.global_position, " 工作台=", is_instance_valid(wb), " 家具数=", _furniture_list.size(), " 敌人数=", TurnManager.get_enemy_units().size())
+	print("=== 家园自动测试完成 (初始仅工作台, 其余家具由玩家建造) ===")
 	# 移动/点击路由回归 (排查"无法行走")
 	_test_movement_routing()
 	# 引导链路: 拿棒球棍 → 装备 → 打丧尸
@@ -904,6 +937,7 @@ func _test_zombie_vision() -> void:
 ## 生存流水线回归: 净化器→种植→生长→收获→睡觉 (Phase 6)
 ## 建造/研究回归: 研究蓝图(消耗素材) → 建造家具(消耗素材+放置) → 占用/序列化校验
 func _test_building_flow() -> void:
+	_reset_home_test_state()
 	var ok := true
 	# 备足素材 (外部收集) — 用 force_add_item 绕过负重限制, 仅验证建造链路本身
 	# (真机玩家需靠负重上限/储物把素材带回家, 此处不测重量约束)
@@ -963,16 +997,63 @@ func _test_building_flow() -> void:
 	print("=== 自动测试: 建造/研究=", ok, " (应为 true), 已研究=", BuildingManager.researched.size(), " 已建=", BuildingManager.built.size())
 
 
+## 测试隔离: 清空建造状态 + 移除除工作台外的家具节点 + 清测试素材
+## 让 引导/生存/建造 三个自测互不污染 (它们共享 BuildingManager 全局状态)
+func _reset_home_test_state() -> void:
+	BuildingManager.reset()
+	for f in _furniture_list.duplicate():
+		if f is HF and f.kind == HF.Kind.WORKBENCH:
+			continue
+		_furniture_list.erase(f)
+		if is_instance_valid(f):
+			f.queue_free()
+	for k in _home_furniture.keys().duplicate():
+		if int(k) == HF.Kind.WORKBENCH:
+			continue
+		_home_furniture.erase(k)
+	for id in ["wood", "nail", "cloth", "metal_scrap", "seed_vegetable", "water_pure", "water_polluted", "zombie_flesh", "baseball_bat"]:
+		var n: int = InventoryBackpack.count_item(id)
+		if n > 0:
+			InventoryBackpack.remove_item(id, n)
+
+
 func _test_survival_flow() -> void:
+	_reset_home_test_state()
 	var ok := true
 	# 测试环境: 临时放大负重上限 (避免 10kg 初始容量限制干扰流水线链路验证, 结束后恢复)
 	var backup_max_weight: float = InventoryBackpack.max_weight
 	InventoryBackpack.max_weight = 200.0
-	# 测试环境: 确保有种子和净水
-	_player.add_item("seed_vegetable", 3)
-	_player.add_item("water_pure", 3)
+	# 新流程: 初始家园只有工作台, 其余家具需先建造 (给足素材)
+	InventoryBackpack.force_add_item("wood", 40)
+	InventoryBackpack.force_add_item("nail", 40)
+	InventoryBackpack.force_add_item("metal_scrap", 40)
+	InventoryBackpack.force_add_item("cloth", 40)
+	# 确保有种子/净水/污染水/升级材料 (force_add 绕过负重, 与上方素材一致)
+	InventoryBackpack.force_add_item("seed_vegetable", 3)
+	InventoryBackpack.force_add_item("water_pure", 3)
+	InventoryBackpack.force_add_item("water_polluted", 4)
+	InventoryBackpack.force_add_item("zombie_flesh", 3)
+	InventoryBackpack.force_add_item("wood", 2)
+	# 建造所需家具: 收集器/净化器/种植区/床 (复用原预置格, 均为空地)
+	var spec := [
+		[HF.Kind.RAIN_COLLECTOR, COLLECTOR_CELL],
+		[HF.Kind.PURIFIER, PURIFIER_CELL],
+		[HF.Kind.PLANTING_BED, PLANTING_CELL],
+		[HF.Kind.BED, BED_CELL],
+	]
+	for s in spec:
+		var kind: int = int(s[0])
+		var cell: Vector2i = s[1]
+		var rb := BuildingManager.research(kind)
+		if not rb.get("success", false):
+			ok = false
+			push_error("[Home] 研究失败: ", rb)
+		var r_build := BuildingManager.commit_build(kind, cell)
+		if not r_build.get("success", false):
+			ok = false
+			push_error("[Home] 建造失败: ", r_build)
+		_spawn_built_furniture(kind, cell)
 	# 1. 净化器: 放 2 污染水 → 净化 → 得净水
-	_player.add_item("water_polluted", 4)
 	var purifier: HF = _home_furniture.get(HF.Kind.PURIFIER)
 	var r_purify: Dictionary = purifier.purify()
 	if not r_purify.get("success", false):
@@ -1025,8 +1106,6 @@ func _test_survival_flow() -> void:
 		ok = false
 		push_error("[Home] 睡觉未恢复精力: ", ap_before, " -> ", _player.ap_current)
 	# 5. 床升级: 给材料 → 升级 → 恢复量提升
-	_player.add_item("zombie_flesh", 3)
-	_player.add_item("wood", 2)
 	var r_upgrade: Dictionary = bed.upgrade_bed()
 	if not r_upgrade.get("success", false):
 		ok = false
@@ -1043,24 +1122,38 @@ func _test_survival_flow() -> void:
 	print("=== 生存流水线=", ok, " (应为 true), 净水=", _player.count_item("water_pure"), " 污染水=", _player.count_item("water_polluted"), " 床Lv=", bed.bed_level)
 
 
-## 新手引导全链路回归: 拿走→装备→击杀
+## 新手引导全链路回归: 装备→攻击/战斗→搜刮→建造→升级
 func _test_tutorial_flow() -> void:
-	# 测试场景直接加载未走 start_new_game, 手动开启引导模式
 	if GameManager:
 		GameManager.set_tutorial_for_test(true)
-	var chest: Node = _furniture_list[0]
-	# 0. 模拟点击衣柜 (推进 chest_opened 步骤)
-	_tutorial_step_completed("chest_opened")
-	# 1. 拿走棒球棍
-	chest.remove_internal_item("baseball_bat")
+	_reset_home_test_state()
+	# 1. 装备武器 (触发 equipment_changed → 推进 equipped)
 	_player.add_item("baseball_bat", 1)
-	# 2. 装备 (触发 equipment_changed 信号 → 推进 equipped 步骤)
 	var equipped: bool = _player.equip_item("baseball_bat")
+	await get_tree().process_frame
 	print("=== 引导测试: 装备棒球棍=", equipped, " (应为 true)")
-	# 3. 击杀花园丧尸 (模拟: 直接扣血到死 → enemy_died 信号 → 推进 zombie_killed)
-	var zombie: Node = TurnManager.get_enemy_units()[0] if TurnManager.get_enemy_units().size() > 0 else null
-	if zombie:
-		zombie.take_damage(9999.0)
-		await get_tree().process_frame
+	# 2. 发起战斗 (模拟点击丧尸进入战斗 → 推进 combat_started)
+	TurnManager.combat_started.emit()
+	await get_tree().process_frame
+	# 3. 搜刮 (模拟打开容器 → 推进 looted)
+	container_opened.emit(self)
+	await get_tree().process_frame
+	# 4. 建造床 + 储物箱 (研究+建造+放置 → 两者就绪推进 built)
+	InventoryBackpack.force_add_item("wood", 20)
+	InventoryBackpack.force_add_item("nail", 10)
+	InventoryBackpack.force_add_item("cloth", 10)
+	BuildingManager.research(HF.Kind.BED)
+	BuildingManager.commit_build(HF.Kind.BED, BED_CELL)
+	_spawn_built_furniture(HF.Kind.BED, BED_CELL)
+	BuildingManager.research(HF.Kind.CHEST)
+	BuildingManager.commit_build(HF.Kind.CHEST, CHEST_CELL)
+	_spawn_built_furniture(HF.Kind.CHEST, CHEST_CELL)
+	await get_tree().process_frame
+	# 5. 升级床 (右键 → _handle_home_furniture → 推进 upgraded → done)
+	InventoryBackpack.force_add_item("zombie_flesh", 5)
+	_last_right_click_on_furniture = true
+	var bed: HF = _home_furniture.get(HF.Kind.BED)
+	_handle_home_furniture(bed)
+	await get_tree().process_frame
 	print("=== 引导测试: 引导步骤=", _tutorial_step, " (应为 done)")
 	print("=== 引导测试: 教程完成=", not GameManager.is_tutorial_mode() if GameManager else true, " (应为 true)")
