@@ -42,7 +42,7 @@ var _prog_label: Label = null
 var _fab: Button = null
 
 var TITLE_HOME_POS := Vector2(0, 500)  # 主页面居中 (x 按文字宽度运行时算)
-const TITLE_SELECT_POS := Vector2(44, 52)
+const TITLE_SELECT_POS := Vector2(28, 52)  # select 态: 靠左对齐 (与副标题/返回同左缘)
 const TITLE_HOME_FONT := 52
 const TITLE_SELECT_SCALE := 0.5
 
@@ -69,8 +69,9 @@ func _build_ui() -> void:
 	_title = Label.new()
 	_title.text = "末 日 生 存"
 	_title.add_theme_font_size_override("font_size", TITLE_HOME_FONT)
-	_title.add_theme_color_override("font_color", Palette.ORANGE)
-	_title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.45))
+	# home 态: 配色深蓝 #4E7D96 (深色渐变背景上醒目); select 态由过渡切白字 (蓝 header 上可见)
+	_title.add_theme_color_override("font_color", Palette.BLUE)
+	_title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.55))
 	_title.add_theme_constant_override("outline_size", 6)
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_title.z_index = 10
@@ -155,7 +156,7 @@ func _build_select_ui(root: Control) -> void:
 
 	var sub := Label.new()
 	sub.text = "选择你的幸存者"
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT  # 靠左 (与左上角标题/返回同左缘)
 	sub.add_theme_font_size_override("font_size", 15)
 	sub.add_theme_color_override("font_color", Color(1, 1, 1, 0.85))
 	sub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -297,6 +298,9 @@ func _transition_select() -> void:
 	_select_root.modulate.a = 1.0
 	_select_root.position.y = 180.0
 	_title.pivot_offset = _title.size / 2.0
+	# select 态: 标题切白字 + 深描边 (在蓝色 header 上可见)
+	_title.add_theme_color_override("font_color", Palette.LIGHT)
+	_title.add_theme_color_override("font_outline_color", Color(0.02, 0.04, 0.10, 0.8))
 	var tw := create_tween()
 	tw.set_parallel(true)
 	tw.tween_property(_title, "position", TITLE_SELECT_POS, 0.42) \
@@ -321,6 +325,9 @@ func _transition_home() -> void:
 	_home_btns.visible = true
 	_home_btns.modulate.a = 0.0
 	_back_btn.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# home 态: 标题切回配色深蓝
+	_title.add_theme_color_override("font_color", Palette.BLUE)
+	_title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.55))
 	var tw := create_tween()
 	tw.set_parallel(true)
 	tw.tween_property(_title, "position", TITLE_HOME_POS, 0.42) \
@@ -387,25 +394,10 @@ func _make_role_row(id: int, avatar_color: Color) -> PanelContainer:
 	series_l.add_theme_color_override("font_color", Color(0.40, 0.45, 0.52))
 	tv.add_child(series_l)
 
-	var tag := PanelContainer.new()
-	tag.custom_minimum_size = Vector2(78, 28)
-	tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	# 状态用行底色区分 (无文字 tag): 已解锁=偏白 / 未解锁=偏一点蓝
 	var unlocked: bool = GameManager.is_character_unlocked(id)
-	var tag_sb := StyleBoxFlat.new()
-	tag_sb.bg_color = Palette.ORANGE if unlocked else Palette.TAG_BG_LOCK
-	tag_sb.set_corner_radius_all(14)
-	tag.add_theme_stylebox_override("panel", tag_sb)
-	hbox.add_child(tag)
-
-	var tag_l := Label.new()
-	tag_l.text = "已解锁" if unlocked else "🔒"
-	tag_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	tag_l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	tag_l.add_theme_font_size_override("font_size", 12)
-	tag_l.add_theme_color_override("font_color", Palette.LIGHT)
-	tag_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	tag_l.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	tag.add_child(tag_l)
+	row.set_meta("unlocked", unlocked)
+	_apply_row_style(row, false, unlocked)
 
 	return row
 
@@ -415,15 +407,22 @@ func _on_row_gui_input(event: InputEvent, id: int) -> void:
 		_select(id)
 
 
-func _apply_row_style(row: PanelContainer, selected: bool) -> void:
+func _apply_row_style(row: PanelContainer, selected: bool, unlocked: bool = true) -> void:
 	var sb := StyleBoxFlat.new()
 	if selected:
 		sb.bg_color = Palette.CARD_LIGHT_ROW_SEL
 		sb.border_color = Palette.ORANGE
 		sb.border_width_left = 4
-	else:
+	elif unlocked:
+		# 已解锁: 偏白底色
 		sb.bg_color = Palette.CARD_LIGHT_ROW
 		sb.border_color = Color(0, 0, 0, 0)
+		sb.border_width_left = 0
+	else:
+		# 未解锁: 偏一点点蓝的底色 (淡蓝 #E3EDF2)
+		sb.bg_color = Color("#E3EDF2")
+		sb.border_color = Color(0, 0, 0, 0)
+		sb.border_width_left = 0
 	sb.set_corner_radius_all(14)
 	sb.content_margin_left = 12
 	sb.content_margin_right = 12
@@ -461,7 +460,9 @@ func _select(id: int) -> void:
 	if _prog_label:
 		_prog_label.text = "%d / 5" % (CHAR_ORDER.find(_selected_id) + 1)
 	for cid in _rows.keys():
-		_apply_row_style(_rows[cid], cid == _selected_id)
+		var row: PanelContainer = _rows[cid]
+		var unlocked: bool = bool(row.get_meta("unlocked", true))
+		_apply_row_style(row, cid == _selected_id, unlocked)
 	var profile: Dictionary = GameManager.get_character_profile(id)
 	_detail_title.text = GameManager.get_character_name(id)
 	_detail_series.text = GameManager.get_character_series(id)
