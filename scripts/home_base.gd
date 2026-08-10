@@ -19,21 +19,21 @@ const BMU := preload("res://scripts/ui/build_menu.gd")
 const MAP_W := 16
 const MAP_H := 16
 
-## 房间范围 (格)
-const ROOM_X0 := 2
-const ROOM_Y0 := 2
-const ROOM_X1 := 7
-const ROOM_Y1 := 7
-## 门位置 (房间下墙中央, 内侧(4,6)为房间地板/外侧(4,8)为花园 → 内外连通)
-const DOOR_CELL := Vector2i(4, 7)
-## 衣柜位置 (房间左上角)
+## 房间范围 (格) — 屋子贴地图左上角, 花园在右/下方; 可通过"扩建房屋"向右下扩展
+const ROOM_X0 := 1
+const ROOM_Y0 := 1
+const ROOM_X1 := 6
+const ROOM_Y1 := 6
+## 门位置 (房间下墙中央, 扩建后自动跟随新下墙)
+var DOOR_CELL := Vector2i(4, 6)
+## 衣柜位置 (房间内左上角, 测试/教程用)
 const CHEST_CELL := Vector2i(2, 2)
-## 床位置 (房间右上)
-const BED_CELL := Vector2i(6, 2)
-## 净化器位置 (房间左下)
-const PURIFIER_CELL := Vector2i(2, 6)
-## 玩家出生 (房间中央)
-const SPAWN_CELL := Vector2i(4, 5)
+## 床位置 (房间内右上)
+const BED_CELL := Vector2i(5, 2)
+## 净化器位置 (房间内左下)
+const PURIFIER_CELL := Vector2i(2, 5)
+## 玩家出生 (房间内中央)
+const SPAWN_CELL := Vector2i(4, 3)
 ## 花园丧尸位置
 const ZOMBIE_CELL := Vector2i(11, 4)
 ## 雨水收集器位置 (花园左上, 需露天)
@@ -41,7 +41,14 @@ const COLLECTOR_CELL := Vector2i(10, 3)
 ## 种植区位置 (花园)
 const PLANTING_CELL := Vector2i(12, 9)
 ## 健身器材位置 (房间内, 锻炼用)
-const GYM_CELL := Vector2i(4, 2)
+const GYM_CELL := Vector2i(3, 2)
+
+## 房间矩形 (墙边界, 运行时随扩建变化)
+var _room_rect := Rect2i(ROOM_X0, ROOM_Y0, ROOM_X1 - ROOM_X0 + 1, ROOM_Y1 - ROOM_Y0 + 1)
+var _room_expansions: int = 0
+## 扩建上限与基础材料 (每次递增: 木材 +3 / 钉子 +3)
+const ROOM_EXPAND_MAX := 5
+const ROOM_EXPAND_COST_BASE := {"wood": 6, "nail": 3}
 
 var _furniture_list: Array = []
 ## 功能家具: kind → HomeFurniture (交互分发用)
@@ -78,19 +85,10 @@ func _create_world() -> void:
 		_set_wall(Vector2i(0, y))
 		_set_wall(Vector2i(MAP_W - 1, y))
 
-	# 房间墙 (围一圈, 留门)
-	for x in range(ROOM_X0, ROOM_X1 + 1):
-		_set_wall(Vector2i(x, ROOM_Y0))
-		_set_wall(Vector2i(x, ROOM_Y1))
-	for y in range(ROOM_Y0, ROOM_Y1 + 1):
-		_set_wall(Vector2i(ROOM_X0, y))
-		_set_wall(Vector2i(ROOM_X1, y))
-
-	# 门 (房间下墙中央, 1 格宽开口): 内侧(4,6)为房间地板, 外侧(4,8)为花园 (用户要求门只 1 格)
-	var door_cells := [DOOR_CELL]
-	for dc in door_cells:
-		_tilemap.set_cell(dc, 0, Vector2i(TSB.Tiles.DOOR, 0))
-		_door_cells[dc] = true
+	# 房间墙 (围一圈, 留门) — 用运行时矩形, 支持扩建
+	_draw_room_walls()
+	# 门 (房间下墙中央, 1 格宽开口)
+	_redraw_door()
 
 	# 院门: 南墙中央 (朝南通往主地图) — 走到触发存档 + 切换到世界地图 (战略层格子)
 	# (用户需求: 出了院子门就到主地图; 家是主地图里的一个格子)
@@ -128,6 +126,76 @@ var EXIT_CELL: Vector2i = Vector2i(8, 15)
 
 func _set_wall(cell: Vector2i) -> void:
 	_tilemap.set_cell(cell, 0, Vector2i(TSB.Tiles.WALL, 0))
+
+
+## 按当前房间矩形画四面墙 (扩建后由 expand_house 调用重绘)
+func _draw_room_walls() -> void:
+	for x in range(_room_rect.position.x, _room_rect.end.x):
+		_set_wall(Vector2i(x, _room_rect.position.y))
+		_set_wall(Vector2i(x, _room_rect.end.y - 1))
+	for y in range(_room_rect.position.y, _room_rect.end.y):
+		_set_wall(Vector2i(_room_rect.position.x, y))
+		_set_wall(Vector2i(_room_rect.end.x - 1, y))
+
+
+## 门: 房间下墙中央 1 格 (扩建后旧门变墙, 新门跟随新下墙; 院门 EXIT_CELL 保留)
+func _redraw_door() -> void:
+	for dc in _door_cells.keys():
+		if dc != EXIT_CELL:
+			_tilemap.set_cell(dc, 0, Vector2i(TSB.Tiles.WALL, 0))
+			_door_cells.erase(dc)
+	var door := Vector2i(_room_rect.position.x + _room_rect.size.x / 2, _room_rect.end.y - 1)
+	_tilemap.set_cell(door, 0, Vector2i(TSB.Tiles.DOOR, 0))
+	_door_cells[door] = true
+	DOOR_CELL = door
+
+
+## 扩建房屋: 房间向右下各扩 1 格 (旧右/下墙变地板, 新右/下墙外推, 门跟到新下墙)
+## 材料递增: 第 N 次 = 木材 6+3N, 钉子 3+3N; 上限 ROOM_EXPAND_MAX 次
+func expand_house() -> Dictionary:
+	if _room_expansions >= ROOM_EXPAND_MAX:
+		return {"success": false, "message": "房屋已达扩建上限 (%d 次)" % ROOM_EXPAND_MAX}
+	var new_rect := Rect2i(_room_rect.position, _room_rect.size + Vector2i(1, 1))
+	if new_rect.end.x >= MAP_W or new_rect.end.y >= MAP_H:
+		return {"success": false, "message": "已到家园边缘, 无法再扩建"}
+	var cost := {}
+	for id in ROOM_EXPAND_COST_BASE:
+		cost[id] = int(ROOM_EXPAND_COST_BASE[id]) + _room_expansions * 3
+	if not BuildingManager.can_afford(cost):
+		return {"success": false, "message": "材料不足: 需要 " + BuildingManager.cost_text(cost)}
+	for id in cost:
+		InventoryBackpack.remove_item(id, int(cost[id]))
+	# 旧右墙 → 地板
+	for y in range(_room_rect.position.y, _room_rect.end.y):
+		_tilemap.set_cell(Vector2i(_room_rect.end.x - 1, y), 0, Vector2i(TSB.Tiles.FLOOR, 0))
+	# 旧下墙 → 地板
+	for x in range(_room_rect.position.x, _room_rect.end.x):
+		_tilemap.set_cell(Vector2i(x, _room_rect.end.y - 1), 0, Vector2i(TSB.Tiles.FLOOR, 0))
+	_room_rect = new_rect
+	# 新右墙 + 新下墙
+	_draw_room_walls()
+	# 门跟随新下墙
+	_redraw_door()
+	_room_expansions += 1
+	if BuildingManager:
+		BuildingManager.room_expansions = _room_expansions  # 随存档持久化
+	_refresh_move_grid()
+	return {"success": true, "message": "房屋扩建成功 (%dx%d), 新空间可继续建造家具" % [_room_rect.size.x, _room_rect.size.y]}
+
+
+## 读档恢复: 按 BuildingManager.room_expansions 重建房间大小 (初始墙已画, 此处补画扩展墙)
+func _restore_room_expansions() -> void:
+	if not BuildingManager or BuildingManager.room_expansions <= 0:
+		return
+	var n: int = BuildingManager.room_expansions
+	_room_expansions = n
+	_room_rect = Rect2i(_room_rect.position, _room_rect.size + Vector2i(n, n))
+	if _room_rect.end.x > MAP_W or _room_rect.end.y > MAP_H:
+		_room_rect = Rect2i(_room_rect.position, Vector2i(MAP_W - _room_rect.position.x, MAP_H - _room_rect.position.y))
+	_draw_room_walls()
+	_redraw_door()
+	_refresh_move_grid()
+	print("[HomeBase] 读档恢复房屋扩建: ", n, " 次, 房间=", _room_rect.size)
 
 
 func is_cell_walkable(cell_center: Vector2) -> bool:
@@ -283,8 +351,15 @@ func _setup_build_menu() -> void:
 		add_child(_build_menu)
 		_build_menu.build_selected.connect(_on_build_selected)
 		_build_menu.closed.connect(_on_build_menu_closed)
+		if _build_menu.has_signal("expand_requested") and not _build_menu.expand_requested.is_connected(_on_expand_requested):
+			_build_menu.expand_requested.connect(_on_expand_requested)
 	# 读档恢复: 把 BuildingManager 中已建家具生成到场景
 	_spawn_built_furniture_all()
+
+
+## 工作台面板"扩建房屋" → 扩大房间面积
+func _on_expand_requested() -> void:
+	_show_result(expand_house())
 
 
 func _on_build_selected(kind: int) -> void:
@@ -644,6 +719,8 @@ func _on_scene_ready() -> void:
 	if GameManager and GameManager.is_tutorial_mode():
 		_show_tutorial_hint("你在家园废墟中醒来。打开背包，把木棒装备到武器槽；然后走到花园点击丧尸发起攻击")
 	_setup_build_menu()
+	# 读档恢复房屋扩建 (BuildingManager.room_expansions 持久化)
+	_restore_room_expansions()
 	if "--auto-test" in OS.get_cmdline_user_args():
 		_run_auto_test_sync()
 		_run_auto_test()
@@ -792,6 +869,8 @@ func _run_auto_test() -> void:
 	_test_movement_routing()
 	# 工作台交互: 模拟点击工作台 → 应打开建造/研究面板
 	_test_workbench_interact()
+	# 家具视觉不拦截鼠标: 所有家具子 Control 必须 IGNORE (真机悬停高亮消失/点击被吞的根因)
+	_test_furniture_mouse_filter()
 	# 引导链路: 拿棒球棍 → 装备 → 打丧尸
 	await _test_tutorial_flow()
 	# 生存流水线: 净化/种植/收获/睡觉
@@ -804,6 +883,8 @@ func _run_auto_test() -> void:
 	_test_wall_blocking()
 	# 读档恢复: JSON 风格存档数据(普通 Array/float) 应完整恢复不崩
 	_test_load_restore()
+	# 房屋扩建: 消耗材料向右下扩房间, 墙/门跟随
+	_test_house_expand()
 
 
 ## 读档恢复回归: 模拟 JSON 存档(普通 Array/float, 非类型化) → apply_pending_player_data 完整恢复不崩
@@ -843,6 +924,42 @@ func _test_load_restore() -> void:
 	print("=== 自动测试: 读档恢复(JSON类型)=", ok, " (应为 true)")
 
 
+## 房屋扩建回归: 消耗材料 → 房间向右下扩 1 格, 旧墙变地板/新墙立起/门跟随新下墙
+func _test_house_expand() -> void:
+	var ok := true
+	var base_size: Vector2i = _room_rect.size
+	InventoryBackpack.force_add_item("wood", 60)
+	InventoryBackpack.force_add_item("nail", 30)
+	var r1 := expand_house()
+	if not r1.get("success", false):
+		ok = false
+		push_error("[Expand] 首次扩建失败: ", r1)
+	if _room_rect.size != base_size + Vector2i(1, 1):
+		ok = false
+		push_error("[Expand] 房间尺寸错误: ", _room_rect.size, " 应=", base_size + Vector2i(1, 1))
+	# 旧右墙格变地板, 新右墙不可走
+	var old_right := Vector2i(_room_rect.position.x + base_size.x - 1, _room_rect.position.y + 2)
+	if not is_cell_walkable(_world_pos(old_right)):
+		ok = false
+		push_error("[Expand] 旧右墙未变地板: ", old_right)
+	var new_right := Vector2i(_room_rect.end.x - 1, _room_rect.position.y + 2)
+	if is_cell_walkable(_world_pos(new_right)):
+		ok = false
+		push_error("[Expand] 新右墙应不可走: ", new_right)
+	# 门跟随新下墙中央
+	var expect_door := Vector2i(_room_rect.position.x + _room_rect.size.x / 2, _room_rect.end.y - 1)
+	if not _door_cells.has(expect_door) or DOOR_CELL != expect_door:
+		ok = false
+		push_error("[Expand] 门未跟随新下墙: 期望=", expect_door, " 实际门=", DOOR_CELL)
+	# 材料不足应拒绝
+	InventoryBackpack.remove_item("wood", 200)
+	InventoryBackpack.remove_item("nail", 200)
+	if expand_house().get("success", false):
+		ok = false
+		push_error("[Expand] 材料不足却扩建成功")
+	print("=== 自动测试: 房屋扩建=", ok, " (应为 true) 房间=", _room_rect.size)
+
+
 ## 工作台交互回归: 模拟左键点击工作台格 (3,2) → 应打开建造/研究面板
 ## (覆盖: _unhandled_input → _handle_explore_click → _raycast_interactable(家具) → _on_interact → WORKBENCH 分支)
 func _test_workbench_interact() -> void:
@@ -866,6 +983,21 @@ func _test_workbench_interact() -> void:
 	print("=== 自动测试: 点击工作台打开建造菜单=", ok, " (应为 true)")
 
 
+## 家具视觉不拦截鼠标回归: 所有家具子 Control 必须 MOUSE_FILTER_IGNORE
+## 根因: HomeFurniture 色块 ColorRect 默认 STOP → GUI 拾取命中 → 悬停黄色预选消失 + 点击被吞 (真机 bug;
+## headless 自测直调 _unhandled_input 绕过 GUI 拾取, 抓不到, 需静态断言)
+func _test_furniture_mouse_filter() -> void:
+	var ok := true
+	for f in _furniture_list:
+		if not is_instance_valid(f):
+			continue
+		for c in f.get_children():
+			if c is Control and c.mouse_filter != Control.MOUSE_FILTER_IGNORE:
+				ok = false
+				push_error("[Furniture] 视觉控件未设 IGNORE: ", f.name, " / ", c.name)
+	print("=== 自动测试: 家具视觉不拦截鼠标=", ok, " (应为 true)")
+
+
 ## 墙体阻挡回归: ①墙格 is_cell_walkable=false ②墙格物理尺寸 == tile_size (与主角格等大)
 func _test_wall_blocking() -> void:
 	var ok := true
@@ -885,23 +1017,21 @@ func _test_wall_blocking() -> void:
 			ok = false
 			push_error("[Wall] 地图格子 ", tile_px, "px != 主角格 ", tile_size, "px")
 	print("=== 自动测试: 墙体阻挡+格子等大=", ok, " (应为 true) 墙=", wall_cell, " 地板=", floor_cell)
-	# 3. 真实移动: 玩家站房间内 (4,5), 上方 (4,4) 是地板可走, 左方墙 (2,5) 不可走
+	# 3. 真实移动: 玩家站房间内墙边, 朝墙走应被拦; 朝房间内走应放行
 	var ok_move := true
 	_player.global_position = _world_pos(SPAWN_CELL)
 	_player.is_my_turn = true
 	_player.ap_current = _player.ap_max
-	# 向左走 → 墙 (2,5)? SPAWN=(4,5), 左一格 (3,5) 是房间内地板 (可走), 再左 (2,5) 是墙
-	# 直接测: 把玩家放墙边, 朝墙走
-	var stand := Vector2i(3, 5)
-	var wall_left := Vector2i(2, 5)
+	var stand := Vector2i(ROOM_X0 + 1, ROOM_Y0 + 4)  # 内区左下 (2,5)
+	var wall_left := Vector2i(ROOM_X0, stand.y)      # 左墙 (1,5)
 	_player.global_position = _world_pos(stand)
 	_player.is_my_turn = true
 	_player.ap_current = _player.ap_max
-	_player.move_in_direction(Vector2(-1, 0))  # 朝墙 (2,5)
+	_player.move_in_direction(Vector2(-1, 0))  # 朝左墙
 	if _player.is_moving:
 		ok_move = false
 		push_error("[WallWalk] 玩家朝墙移动被放行!")
-	# 朝房间内走 (+1,0) → (4,5) 地板
+	# 朝房间内走 (+1,0) → (3,5) 地板
 	_player.move_in_direction(Vector2(1, 0))
 	if not _player.is_moving:
 		ok_move = false

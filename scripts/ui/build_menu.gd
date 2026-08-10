@@ -12,6 +12,8 @@ const HF := preload("res://scripts/tiles/home_furniture.gd")
 
 signal build_selected(kind: int)
 signal closed()
+## 玩家点"扩建房屋" → 场景扩展房间矩形 (消耗木材/钉子, 随次数递增)
+signal expand_requested()
 
 var _panel: Panel
 var _research_box: VBoxContainer
@@ -84,6 +86,16 @@ func _ready() -> void:
 	bl.add_theme_font_size_override("font_size", 13)
 	bl.add_theme_color_override("font_color", Color(0.7, 1.0, 0.8))
 	vbox.add_child(bl)
+
+	# 扩建房屋: 扩大房间面积 (消耗木材/钉子, 次数递增; 由场景 expand_requested 处理)
+	var expand_btn := Button.new()
+	expand_btn.name = "ExpandHouseBtn"
+	expand_btn.text = "扩建房屋 (木材/钉子, 扩大房间)"
+	expand_btn.custom_minimum_size = Vector2(0, 34)
+	expand_btn.add_theme_font_size_override("font_size", 13)
+	expand_btn.pressed.connect(func() -> void: expand_requested.emit())
+	vbox.add_child(expand_btn)
+
 	var bscroll := ScrollContainer.new()
 	bscroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	bscroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL

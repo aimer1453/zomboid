@@ -51,6 +51,8 @@ func _build_visual() -> void:
 	rect.size = Vector2(_tile_size * 0.8, _tile_size * 0.8)
 	rect.position = -rect.size / 2
 	rect.color = _kind_color()
+	# 关键: 纯视觉控件必须 IGNORE — 否则 GUI 拾取命中它 (悬停高亮消失) 且吞点击 (家具点不动)
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(rect)
 
 	# 家具名标签: 居中在主体中心 (用户反馈: 像尸体一样标注是什么家具)
@@ -72,6 +74,7 @@ func _build_visual() -> void:
 	state.add_theme_font_size_override("font_size", 8)
 	state.add_theme_color_override("font_color", Color(0.9, 0.9, 0.95))
 	state.position = Vector2(-_tile_size * 0.7, _tile_size * 0.5)
+	state.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(state)
 
 

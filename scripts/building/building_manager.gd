@@ -63,6 +63,8 @@ const BLUEPRINTS := {
 var researched: Dictionary = {}
 ## 已建造家具: [{kind, x, y}]
 var built: Array = []
+## 家园房间扩建次数 (home_base 读写, 随存档持久化; 读档后按此重建房间大小)
+var room_expansions: int = 0
 
 
 func _ready() -> void:
@@ -73,6 +75,7 @@ func _ready() -> void:
 func reset() -> void:
 	researched.clear()
 	built.clear()
+	room_expansions = 0
 	for kind in BLUEPRINTS:
 		if BLUEPRINTS[kind].get("preknown", false):
 			researched[kind] = true
@@ -158,12 +161,14 @@ func serialize() -> Dictionary:
 	return {
 		"researched": researched.keys(),
 		"built": built,
+		"room_expansions": room_expansions,
 	}
 
 
 func deserialize(data: Dictionary) -> void:
 	researched.clear()
 	built.clear()
+	room_expansions = int(data.get("room_expansions", 0))
 	for k in data.get("researched", []):
 		researched[int(k)] = true
 	# 保证工作台始终可用
