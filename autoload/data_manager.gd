@@ -307,6 +307,13 @@ func _validate_loot_tables() -> void:
 		for id in eb_script.LOOT_LOW_GEAR:
 			if not _items.has(id):
 				orphans.append(id)
+	# 防御: 覆盖 get_loot_item_pool 的静态池 (当前未调用, 但扫描防将来启用时再犯悬空引用)
+	if "LOOT_POOL_BY_BUILDING" in db_script:
+		var pool: Dictionary = db_script.LOOT_POOL_BY_BUILDING
+		for bt in pool:
+			for id in pool[bt]:
+				if not _items.has(id):
+					orphans.append(id)
 	if not orphans.is_empty():
 		push_error("[DataManager] 战利品表引用了未注册物品(将导致无法拾取): ", orphans)
 	else:

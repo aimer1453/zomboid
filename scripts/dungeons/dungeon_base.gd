@@ -395,17 +395,19 @@ func _use_container_ui() -> bool:
 	return true
 
 
+## 按建筑类型的战利品池 (原为 get_loot_item_pool 局部变量, 提为静态表以便启动期校验扫描, 防悬空物品引用)
+const LOOT_POOL_BY_BUILDING := {
+	BuildingType.APARTMENT: ["canned_food", "bandage", "water_pure", "knife"],
+	BuildingType.SUPERMARKET: ["canned_food", "water_pure", "bandage", "medkit"],
+	BuildingType.POLICE_STATION: ["pistol", "ammo_9mm", "kevlar", "bandage"],
+	BuildingType.HOSPITAL: ["medkit", "bandage", "antidote", "canned_food"],
+	BuildingType.WAREHOUSE: ["ammo_9mm", "rifle", "canned_food", "crowbar"],
+	BuildingType.MILITARY_BASE: ["rifle", "ammo_556", "kevlar", "shotgun"],
+	BuildingType.LAB: ["antidote", "crystal_smooth", "medkit", "blueprint_purifier"],
+}
+
 func get_loot_item_pool() -> Array:
-	var pools := {
-		BuildingType.APARTMENT: ["canned_food", "bandage", "water_pure", "knife"],
-		BuildingType.SUPERMARKET: ["canned_food", "water_pure", "bandage", "medkit"],
-		BuildingType.POLICE_STATION: ["pistol", "ammo_9mm", "kevlar", "bandage"],
-		BuildingType.HOSPITAL: ["medkit", "bandage", "antidote", "canned_food"],
-		BuildingType.WAREHOUSE: ["ammo_9mm", "rifle", "canned_food", "crowbar"],
-		BuildingType.MILITARY_BASE: ["rifle", "ammo_556", "kevlar", "shotgun"],
-		BuildingType.LAB: ["antidote", "crystal_smooth", "medkit", "blueprint_purifier"],
-	}
-	return pools.get(building_type, ["canned_food", "bandage"])
+	return LOOT_POOL_BY_BUILDING.get(building_type, ["canned_food", "bandage"])
 
 
 ## 按地形权重的战利品表: 每个物品有独立权重, 医院/诊所药品占比高, 超市/公寓食物日用高
