@@ -159,11 +159,13 @@ func _make_card(id: int) -> Button:
 
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 3)
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # 撑满 Button 内部宽
 
 	var name_l := Label.new()
 	name_l.text = GameManager.get_character_name(id)
 	name_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_l.add_theme_font_size_override("font_size", 19)
+	name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.add_child(name_l)
 
 	var series_l := Label.new()
@@ -172,6 +174,7 @@ func _make_card(id: int) -> Button:
 	series_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	series_l.add_theme_font_size_override("font_size", 11)
 	series_l.add_theme_color_override("font_color", Color(0.95, 0.8, 0.3))
+	series_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.add_child(series_l)
 
 	if unlocked:
@@ -180,6 +183,7 @@ func _make_card(id: int) -> Button:
 		tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		tag.add_theme_font_size_override("font_size", 12)
 		tag.add_theme_color_override("font_color", Color(0.5, 0.9, 0.5))
+		tag.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		col.add_child(tag)
 	else:
 		var lock := Label.new()
@@ -187,6 +191,7 @@ func _make_card(id: int) -> Button:
 		lock.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		lock.add_theme_font_size_override("font_size", 12)
 		lock.add_theme_color_override("font_color", Color(0.7, 0.4, 0.4))
+		lock.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		col.add_child(lock)
 		var hint := Label.new()
 		hint.text = GameManager.get_unlock_hint(id)
@@ -194,6 +199,7 @@ func _make_card(id: int) -> Button:
 		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		hint.add_theme_font_size_override("font_size", 10)
 		hint.add_theme_color_override("font_color", Color(0.6, 0.6, 0.68))
+		hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		col.add_child(hint)
 
 	card.add_child(col)
