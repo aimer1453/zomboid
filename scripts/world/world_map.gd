@@ -55,14 +55,7 @@ func _wrap_cjk(t: String, per: int = 3) -> String:
 
 
 func _build_ui() -> void:
-	var title := Label.new()
-	title.text = "世界地图 — 点击相邻地点前进，走到新地点自动生成四周"
-	title.add_theme_font_size_override("font_size", 20)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.position = Vector2(0, 30)
-	title.size = Vector2(720, 36)
-	title.add_theme_color_override("font_color", Color(0.92, 0.93, 0.88))
-	add_child(title)
+	# 标题已移除 (用户要求删掉 "世界地图 — 点击相邻地点前进...")
 
 	_info_label = Label.new()
 	_info_label.add_theme_font_size_override("font_size", 14)

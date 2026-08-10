@@ -7,7 +7,7 @@ extends "res://scripts/scenes/game_scene_base.gd"
 # 布局 (16×16 格):
 #   房间 (左上 2..7 x 2..7): 玩家出生 + 衣柜(含棒球棍)
 #   门   (房间右下角): 通往花园
-#   花园 (右侧大片): 1 只初级丧尸
+#   花园 (右侧大片): 动态丧尸入侵 (按天数/击杀/污染缩放, 非固定)
 # 通用逻辑 (UI/输入/点击交互/移动范围) 全部在基类
 
 const TSB := preload("res://scripts/dungeons/tile_set_builder.gd")
@@ -390,17 +390,153 @@ func _spawn_built_furniture_all() -> void:
 		_spawn_built_furniture(int(b["kind"]), Vector2i(int(b["x"]), int(b["y"])))
 
 
-## 花园初级丧尸 (弱化版: 低血量, 新手可击杀)
+## 花园初级丧尸 (弱化版: 低血量, 新手可击杀) — 仅新游戏/教程用
+## 后续返回家园走 _spawn_home_invaders() 动态系统
 func _spawn_garden_zombie() -> void:
+	# 新游戏或 day<=2 且 kill<3 时仍生成 1 只新手丧尸 (引导链路依赖)
+	var is_early: bool = (not WorldTime or WorldTime.day <= 2) and \
+		GameManager and int(GameManager.stats.get("kills", 0)) < 3
+	if not is_early:
+		_spawn_home_invaders()
+		return
 	var zombie_script := load("res://scripts/units/enemies/zombie_basic.gd")
 	var zombie := EF.spawn(self, zombie_script, _world_pos(ZOMBIE_CELL), tile_size, 100.0)
 	zombie.name = "GardenZombie"
 	zombie.world = self
-	# 新手丧尸: 削弱血量, 移动慢
 	zombie.max_hp = 40.0
 	zombie.hp = 40.0
 	zombie.move_speed = 80.0
-	print("[HomeBase] 花园丧尸生成 (初级 HP=", zombie.hp, ") at ", ZOMBIE_CELL)
+	print("[HomeBase] 新手花园丧尸生成 HP=", zombie.hp, " at ", ZOMBIE_CELL)
+
+
+## === 动态家园入侵系统 ===
+## 按世界天数 / 击杀数 / 污染度缩放:
+##   - 数量: 0~3+ (随天数增长, 有概率不刷)
+##   - 类型: basic → runner/spitter → tank (随进度解锁)
+##   - 属性: HP/攻击力按天数微增
+##   - 位置: 花园区域随机 (非固定 ZOMBIE_CELL)
+##   - 概率: 非必刷 (模拟"间隔不一定")
+
+const _GARDEN_SPAWN_CELLS: Array[Vector2i] = [
+	Vector2i(9, 3), Vector2i(10, 3), Vector2i(11, 3), Vector2i(12, 3), Vector2i(13, 3),
+	Vector2i(9, 4), Vector2i(10, 4), Vector2i(11, 4), Vector2i(12, 4), Vector2i(13, 4), Vector2i(14, 4),
+	Vector2i(9, 5), Vector2i(10, 5), Vector2i(11, 5), Vector2i(12, 5), Vector2i(13, 5), Vector2i(14, 5),
+	Vector2i(9, 6), Vector2i(10, 6), Vector2i(11, 6), Vector2i(12, 6), Vector2i(13, 6), Vector2i(14, 6),
+	Vector2i(9, 7), Vector2i(10, 7), Vector2i(11, 7), Vector2i(12, 7), Vector2i(13, 7), Vector2i(14, 7),
+	Vector2i(9, 8), Vector2i(10, 8), Vector2i(11, 8), Vector2i(12, 8), Vector2i(13, 8), Vector2i(14, 8),
+	Vector2i(9, 9), Vector2i(10, 9), Vector2i(11, 9), Vector2i(12, 9), Vector2i(13, 9), Vector2i(14, 9),
+	Vector2i(9, 10), Vector2i(10, 10), Vector2i(11, 10), Vector2i(12, 10), Vector2i(13, 10), Vector2i(14, 10),
+	Vector2i(9, 11), Vector2i(10, 11), Vector2i(11, 11), Vector2i(12, 11), Vector2i(13, 11), Vector2i(14, 11),
+	Vector2i(9, 12), Vector2i(10, 12), Vector2i(11, 12), Vector2i(12, 12), Vector2i(13, 12), Vector2i(14, 12),
+	Vector2i(9, 13), Vector2i(10, 13), Vector2i(11, 13), Vector2i(12, 13), Vector2i(13, 13), Vector2i(14, 13),
+	Vector2i(9, 14), Vector2i(10, 14), Vector2i(11, 14), Vector2i(12, 14), Vector2i(13, 14), Vector2i(14, 14),
+]
+
+
+func _spawn_home_invaders() -> void:
+	if not WorldTime or not GameManager:
+		return
+
+	var game_day: int = WorldTime.day
+	var total_kills: int = int(GameManager.stats.get("kills", 0))
+	var pollution: float = WorldTime.get_pollution(GameManager.current_character) if GameManager.current_character else 0.0
+
+	# --- 基础概率: 不是每次回去都有丧尸 ---
+	# day 1-3: 50% | day 4-7: 70% | day 8+: 85%
+	var spawn_chance: float = 0.50 + mini(0.35, float(game_day) * 0.05)
+	if randf() > spawn_chance:
+		print("[HomeBase] 本次返回家园无入侵 (day=%d chance=%.0f%%)" % [game_day, spawn_chance * 100])
+		return
+
+	# --- 数量: 1~3 只, 随天数缓慢增加 ---
+	# 基础 1 只; 每 5 天 +0.5 只上限; 击杀多→稍微多; 污染重→稍微多
+	var base_count: float = 1.0 + float(game_day) * 0.12 + float(total_kills) * 0.01 + pollution * 0.01
+	var count: int = mini(4, maxi(1, int(base_count)))
+	# 随机波动: 已决定上限后仍有几率少 1 只
+	if randf() < 0.25 and count > 1:
+		count -= 1
+
+	# --- 类型池: 随进度解锁高阶丧尸 ---
+	# basic 始终可用; runner day≥3; spitter day≥6; tank day≥10
+	var type_pool: Array[String] = ["zombie_basic"]
+	if game_day >= 3:
+		type_pool.append("zombie_runner")
+	if game_day >= 6:
+		type_pool.append("zombie_spitter")
+	if game_day >= 10:
+		type_pool.append("zombie_tank")
+
+	# 高阶类型权重低 (basic 最常见)
+	var type_weights: Dictionary = {
+		"zombie_basic": 60,
+		"zombie_runner": 20 if game_day >= 3 else 0,
+		"zombie_spitter": 12 if game_day >= 6 else 0,
+		"zombie_tank": 8 if game_day >= 10 else 0,
+	}
+
+	# --- 属性缩放系数: 天数越长越强 ---
+	# day1=1.0 | day5≈1.15 | day10≈1.3 | day20≈1.6
+	var stat_scale: float = 1.0 + float(game_day) * 0.03 + pollution * 0.002
+
+	# --- 生成 ---
+	var used_cells: Array[Vector2i] = []
+	for i in range(count):
+		var type_key: String = _weighted_pick(type_weights)
+		var cell: Vector2i = _random_garden_cell(used_cells)
+		if cell == Vector2i(-1, -1):
+			break  # 花园格子不够了
+		used_cells.append(cell)
+
+		var zombie_script: Script = load("res://scripts/units/enemies/%s.gd" % type_key)
+		var base_speed: float = _base_speed_for_type(type_key)
+		var zombie := EF.spawn(self, zombie_script, _world_pos(cell), tile_size, base_speed)
+		zombie.name = "HomeInvader_%d_%s" % [i, type_key]
+		zombie.world = self
+
+		# 属性缩放 (在脚本默认值基础上放大)
+		zombie.max_hp = mini(zombie.max_hp * stat_scale, 500.0)
+		zombie.hp = zombie.max_hp
+		zombie.attack_power = mini(zombie.attack_power * stat_scale, 60.0)
+		# 速度也略微提升 (后期丧尸更快)
+		zombie.move_speed = base_speed * (1.0 + mini(0.30, float(game_day) * 0.02))
+
+		print("[HomeBase] 入侵者 #%d: %s HP=%.0f ATK=%.0f at %s (day=%d scale=%.2f)" % [
+			i, type_key, zombie.hp, zombie.attack_power, cell, game_day, stat_scale])
+
+
+## 从权重字典随机选一个键
+func _weighted_pick(weights: Dictionary) -> String:
+	var total: float = 0.0
+	for w in weights.values():
+		total += w
+	var roll: float = randf() * total
+	var acc: float = 0.0
+	for key in weights:
+		acc += weights[key]
+		if roll <= acc:
+			return key
+	return "zombie_basic"
+
+
+## 各类型基础速度
+func _base_speed_for_type(type_key: String) -> float:
+	match type_key:
+		"zombie_basic": return 100.0
+		"zombie_runner": return 160.0
+		"zombie_spitter": return 90.0
+		"zombie_tank": return 70.0
+	return 100.0
+
+
+## 从花园格子里随机选一个未使用的
+func _random_garden_cell(exclude: Array[Vector2i]) -> Vector2i:
+	var available: Array[Vector2i] = []
+	for c in _GARDEN_SPAWN_CELLS:
+		if not c in exclude:
+			available.append(c)
+	if available.is_empty():
+		return Vector2i(-1, -1)
+	return available[randi() % available.size()]
 
 
 # --- 新手引导 (简易) ---
