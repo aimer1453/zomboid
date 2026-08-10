@@ -26,7 +26,7 @@ var _rows: Dictionary = {}          # id -> PanelContainer (角色行)
 var _detail_title: Label = null
 var _detail_series: Label = null
 var _detail_bg: Label = null
-var _detail_tag: Label = null
+var _detail_quest: VBoxContainer = null
 var _fab: Button = null
 
 
@@ -105,11 +105,11 @@ func _build_ui() -> void:
 	prog_s.add_theme_color_override("font_color", Color(1, 1, 1, 0.7))
 	prog.add_child(prog_s)
 
-	# === 白色内容大卡 (与 header 底部圆角衔接) ===
+	# === 白色内容大卡 (与 header 底部圆角衔接, 下探到屏幕底部) ===
 	var card := PanelContainer.new()
 	card.set_anchors_preset(Control.PRESET_FULL_RECT)
 	card.offset_top = 280   # 与 header 底部 ~280 重叠
-	card.offset_bottom = -90 # 留底部导航栏
+	card.offset_bottom = -20 # 屏幕底部留边距
 	card.offset_left = 16
 	card.offset_right = -16
 	var csb := StyleBoxFlat.new()
@@ -169,7 +169,7 @@ func _build_ui() -> void:
 	# 详情区 (选中行下方固定 ~130 高, 显示背景/任务)
 	var detail := PanelContainer.new()
 	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	detail.custom_minimum_size = Vector2(0, 130)
+	detail.custom_minimum_size = Vector2(0, 230)
 	var dsb := StyleBoxFlat.new()
 	dsb.bg_color = Color(0.93, 0.94, 0.96, 0.9)
 	dsb.set_corner_radius_all(14)
@@ -201,49 +201,25 @@ func _build_ui() -> void:
 	_detail_bg.add_theme_color_override("font_color", Color(0.30, 0.34, 0.42))
 	dv.add_child(_detail_bg)
 
-	# === 底部导航栏 ===
-	var nav := PanelContainer.new()
-	nav.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	nav.offset_top = -76
-	nav.offset_bottom = 0
-	nav.offset_left = 0
-	nav.offset_right = 0
-	var nsb := StyleBoxFlat.new()
-	nsb.bg_color = Palette.NAV_BG
-	nsb.set_corner_radius_all(20)
-	nsb.content_margin_left = 24
-	nsb.content_margin_right = 24
-	nsb.shadow_color = Palette.SHADOW
-	nsb.shadow_size = 4
-	nsb.shadow_offset = Vector2(0, -1)
-	nav.add_theme_stylebox_override("panel", nsb)
-	nav.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(nav)
+	var qlabel := Label.new()
+	qlabel.text = "主线任务"
+	qlabel.add_theme_font_size_override("font_size", 12)
+	qlabel.add_theme_color_override("font_color", Palette.TEXT_SECONDARY)
+	dv.add_child(qlabel)
 
-	var nav_hbox := HBoxContainer.new()
-	nav_hbox.add_theme_constant_override("separation", 0)
-	nav_hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	nav_hbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	nav_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	nav.add_child(nav_hbox)
-	for icon_name in ["日历", "时间", "角色"]:
-		var icon_l := Label.new()
-		icon_l.text = icon_name
-		icon_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		icon_l.add_theme_font_size_override("font_size", 13)
-		icon_l.add_theme_color_override("font_color", Palette.NAV_ICON_DIM)
-		icon_l.custom_minimum_size = Vector2(120, 40)
-		icon_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		nav_hbox.add_child(icon_l)
+	_detail_quest = VBoxContainer.new()
+	_detail_quest.add_theme_constant_override("separation", 2)
+	_detail_quest.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dv.add_child(_detail_quest)
 
-	# === 橙色 FAB (右下角, 浮动在导航栏之上) ===
+	# === 橙色 FAB (右下角, 游戏主 CTA = 开始游戏) ===
 	_fab = Button.new()
 	_fab.text = "▶"
 	_fab.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	_fab.offset_left = -84
-	_fab.offset_right = -24
-	_fab.offset_top = -158
-	_fab.offset_bottom = -98
+	_fab.offset_left = -92
+	_fab.offset_right = -32
+	_fab.offset_top = -92
+	_fab.offset_bottom = -32
 	_fab.custom_minimum_size = Vector2(60, 60)
 	_fab.add_theme_font_size_override("font_size", 24)
 	_fab.add_theme_color_override("font_color", Palette.LIGHT)
@@ -426,9 +402,21 @@ func _select(id: int) -> void:
 		_apply_row_style(_rows[cid], cid == _selected_id)
 	# 刷新详情
 	var profile: Dictionary = GameManager.get_character_profile(id)
-	_detail_title.text = GameManager.get_character_name(id) + " — " + str(profile.get("main_quest", []).size()) + " 步主线"
+	_detail_title.text = GameManager.get_character_name(id)
 	_detail_series.text = GameManager.get_character_series(id)
 	_detail_bg.text = GameManager.get_character_background(id)
+	# 主线任务列表
+	for c in _detail_quest.get_children():
+		c.queue_free()
+	var steps: Array = GameManager.get_character_quest(id)
+	for i in mini(steps.size(), 3):
+		var s := Label.new()
+		s.text = "•  " + str(steps[i])
+		s.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		s.add_theme_font_size_override("font_size", 11)
+		s.add_theme_color_override("font_color", Color(0.30, 0.34, 0.42))
+		s.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_detail_quest.add_child(s)
 	# FAB 启用条件
 	_fab.disabled = not GameManager.is_character_unlocked(id)
 
