@@ -225,9 +225,14 @@ func is_cell_free_for_corpse(cell: Vector2i) -> bool:
 			return false
 	return true
 
-## 找一个靠近 cell 的可放尸体格: 优先原地, 其次 4 向, 再 8 向; 优先可通行格 (挤满则原地)
+## 通用"被占用"钩子: 该格是否不可作落点 (尸体/地面物品生成用). 默认 false, 子类(副本)按家具/地形覆写.
+func is_cell_blocked(cell_center: Vector2) -> bool:
+	return false
+
+
+## 找一个靠近 cell 的可放尸体格: 优先原地, 其次 4 向, 再 8 向; 优先可通行且非家具格 (挤满则原地)
 func find_free_corpse_cell(cell: Vector2i) -> Vector2i:
-	if is_cell_free_for_corpse(cell):
+	if is_cell_free_for_corpse(cell) and not _cell_blocked_for_corpse(cell):
 		return cell
 	var offsets: Array[Vector2i] = [
 		Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1),
@@ -238,14 +243,19 @@ func find_free_corpse_cell(cell: Vector2i) -> Vector2i:
 		var c: Vector2i = cell + off
 		if not is_cell_free_for_corpse(c):
 			continue
-		var walk := true
-		if has_method("is_cell_walkable"):
-			walk = is_cell_walkable(_world_pos(c))
-		if walk:
-			return c
-		if any_fallback == cell:
-			any_fallback = c
+		if _cell_blocked_for_corpse(c):
+			if any_fallback == cell:
+				any_fallback = c
+			continue
+		return c
 	return any_fallback
+
+
+## 尸体落点是否被占用(墙/家具/越界): 统一走子类钩子 is_cell_blocked
+func _cell_blocked_for_corpse(cell: Vector2i) -> bool:
+	if has_method("is_cell_blocked"):
+		return is_cell_blocked(_world_pos(cell))
+	return false
 
 
 ## 注册地面物品 (ContainerUI 丢弃 / 拾取后移除)

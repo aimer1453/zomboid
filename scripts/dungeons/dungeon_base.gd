@@ -187,7 +187,18 @@ func is_cell_walkable(cell_center: Vector2) -> bool:
 	var cell := _cell_of(cell_center)
 	if cell.x < 0 or cell.x >= dungeon_width or cell.y < 0 or cell.y >= dungeon_height:
 		return false
-	return _generator.get_cell(cell.x, cell.y) != 0
+	if _generator.get_cell(cell.x, cell.y) == 0:
+		return false  # 墙
+	# 家具(衣柜/货架/箱/保险箱等)视为不可走, 与墙一致 (用户反馈: 货架应像墙一样挡路, 丧尸不应踩上去)
+	for f in _furniture_list:
+		if is_instance_valid(f) and f.get("grid_pos") == cell:
+			return false
+	return true
+
+
+## 通用"被占用"钩子: 该格是否不可作落点 (尸体/地面物品生成用). 基类默认 false, 副本里=不可走.
+func is_cell_blocked(cell_center: Vector2) -> bool:
+	return not is_cell_walkable(cell_center)
 
 
 # --- 玩家 ---
@@ -704,11 +715,37 @@ func _test_exit_logic() -> void:
 	print("=== 自动测试: 出口触发逻辑=", ok, " (应为 true) ===")
 
 
+## 验证家具(衣柜/货架/箱等)与墙一样不可行走: 丧尸/玩家都不能踩上去, 尸体也不落其格
+func _test_furniture_blocks_movement() -> void:
+	var ok := true
+	var blocked := 0
+	for f in _furniture_list:
+		if not is_instance_valid(f):
+			continue
+		var gp: Variant = f.get("grid_pos")
+		if gp == null or not (gp is Vector2i):
+			continue
+		if is_cell_walkable(_world_pos(gp)):
+			ok = false
+			push_error("[Furniture] 家具格应不可走: ", gp)
+		else:
+			blocked += 1
+		# 尸体落点也应避开家具格
+		if find_free_corpse_cell(gp) == gp:
+			ok = false
+			push_error("[Furniture] 尸体落点不应落在家具格: ", gp)
+	if _furniture_list.size() > 0 and blocked == 0:
+		ok = false
+		push_error("[Furniture] 没有任何家具被判定为不可走")
+	print("=== 自动测试: 家具不可行走=", ok, " (应为 true) 家具数=", _furniture_list.size(), " 被挡=", blocked, " ===")
+
+
 func _run_auto_test() -> void:
 	await get_tree().create_timer(0.6).timeout
 	_suppress_stairs = true   # 脚本化移动期间抑制楼梯触发, 避免误换层
 	_test_floor_switch()
 	_test_exit_logic()
+	_test_furniture_blocks_movement()
 	print("=== 自动测试: 探索连续移动 x3 ===")
 	var start := _player.global_position
 	_player.move_to_cell(start + Vector2(tile_size * 2, 0))

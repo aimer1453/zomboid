@@ -134,6 +134,19 @@ func _ready() -> void:
 		if not s.is_empty():
 			stats = s
 	print("[GameManager] 初始化完成, 已解锁角色: ", unlocked_characters)
+	# 定时自动存档 (每 5 分钟), 仅在进行中(EXPLORING)时触发, 避免菜单/死亡界面误写档
+	var autosave_timer := Timer.new()
+	autosave_timer.name = "AutoSaveTimer"
+	autosave_timer.wait_time = 300.0
+	autosave_timer.timeout.connect(_on_autosave_tick)
+	add_child(autosave_timer)
+	autosave_timer.start()
+
+
+## 定时自动存档回调: 仅在进行中状态写入单槽存档 (会弹出"已自动存档"提示)
+func _on_autosave_tick() -> void:
+	if current_state == GameState.EXPLORING:
+		save_game()
 
 
 ## 新游戏开场: 家园醒来 + 新手引导
@@ -324,7 +337,53 @@ const HARDCORE_SAVE_SLOT := 0
 
 
 func save_game() -> bool:
-	return save_game_slot(HARDCORE_SAVE_SLOT)
+	var ok := save_game_slot(HARDCORE_SAVE_SLOT)
+	if ok:
+		show_save_toast("已自动存档")
+	return ok
+
+
+## 顶部黑条 + 居中白字提示 (渐显→停留→渐隐), 用于"已自动存档"等系统通知
+func show_save_toast(msg: String = "已自动存档") -> void:
+	if not get_tree():
+		return
+	var root := get_tree().root
+	if root == null:
+		return
+	# 已有提示则先清掉, 避免叠加
+	var old := root.get_node_or_null("AutoSaveToast")
+	if old:
+		old.queue_free()
+	var layer := CanvasLayer.new()
+	layer.name = "AutoSaveToast"
+	layer.layer = 300  # 高于 HUD/面板
+	root.add_child(layer)
+	var bar := Control.new()
+	bar.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(bar)
+	var bg := ColorRect.new()
+	bg.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	bg.size = Vector2(0, 56)
+	bg.color = Color(0, 0, 0, 1)
+	bg.modulate.a = 0.0
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.add_child(bg)
+	var label := Label.new()
+	label.text = msg
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 20)
+	label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	label.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	label.size = Vector2(0, 56)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.add_child(label)
+	var tw := layer.create_tween()
+	tw.tween_property(bg, "modulate:a", 0.85, 0.3)
+	tw.tween_interval(1.0)
+	tw.tween_property(bg, "modulate:a", 0.0, 0.5)
+	tw.tween_callback(layer.queue_free)
 
 
 func save_game_slot(slot: int) -> bool:

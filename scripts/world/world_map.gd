@@ -33,9 +33,14 @@ func _setup_cell_layer() -> void:
 	add_child(_cell_layer)
 
 
+## 以主角为中心: 把 9x9 窗口居中到实际视口 (玩家"你"标记天然落在屏幕正中)
 func _window_origin() -> Vector2:
-	var win_w := (2 * RADIUS + 1) * CELL
-	return Vector2((720 - win_w) / 2.0, 150.0)
+	var win := (2 * RADIUS + 1) * CELL
+	var vp := get_viewport_rect().size
+	var x := (vp.x - win) / 2.0
+	# 顶部给标题/按钮留 140px, 否则地图会压到它们
+	var y := maxf(140.0, (vp.y - win) / 2.0)
+	return Vector2(x, y)
 
 
 func _build_ui() -> void:

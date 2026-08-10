@@ -284,24 +284,44 @@ func _rand_dir_4() -> Vector2:
 	return dirs[randi() % dirs.size()]
 
 
+## 目标格能否走: 不在玩家所在格 + 世界允许 (墙/家具均挡路). 兜底用基类 _is_cell_walkable.
+func _can_step_to(target: Vector2) -> bool:
+	if target.distance_to(global_position) < tile_size * 0.5:
+		return false  # 不要走到玩家身上
+	if world and world.has_method("is_cell_walkable"):
+		return world.is_cell_walkable(target)
+	return _is_cell_walkable(target)
+
+
+## 按优先级尝试一组 4 方向, 命中第一个可走格即走; 全被挡则原地不动 (不再硬闯墙/货架)
+func _try_step_in_dirs(dirs: Array[Vector2]) -> bool:
+	for d in dirs:
+		if d == Vector2.ZERO:
+			continue
+		var target := snap_to_grid(global_position + d * tile_size)
+		if _can_step_to(target):
+			start_walk(target)
+			return true
+	return false
+
+
 func _step_toward_player(_steps: int = 1) -> void:
 	var player := TurnManager.get_player()
 	if not player or not is_instance_valid(player):
 		return
-	# 4 方向 (禁对角): 按差值大的轴朝玩家走 1 格
+	# 4 方向 (禁对角): 主轴向朝玩家; 被挡则走另一轴绕开墙/家具
 	var delta: Vector2 = player.global_position - global_position
-	var dir := Vector2.ZERO
+	if delta == Vector2.ZERO:
+		return
+	var primary := Vector2.ZERO
+	var secondary := Vector2.ZERO
 	if absf(delta.x) >= absf(delta.y):
-		dir = Vector2(signf(delta.x), 0)
+		primary = Vector2(signf(delta.x), 0)
+		secondary = Vector2(0, signf(delta.y))
 	else:
-		dir = Vector2(0, signf(delta.y))
-	if dir == Vector2.ZERO:
-		return
-	var target := snap_to_grid(global_position + dir * tile_size)
-	# 目标不能是玩家所在格
-	if target.distance_to(player.global_position) < tile_size * 0.5:
-		return
-	start_walk(target)
+		primary = Vector2(0, signf(delta.y))
+		secondary = Vector2(signf(delta.x), 0)
+	_try_step_in_dirs([primary, secondary])
 
 
 func _step_away_from_player() -> void:
@@ -316,17 +336,19 @@ func _step_away_from_player() -> void:
 	if _escape_detached and global_position.distance_to(player.global_position) >= tile_size * FLEE_DELETE_TILES:
 		_escape_remove_from_world()
 		return
-	# 4 方向 (禁对角)
+	# 4 方向 (禁对角): 主轴向远离玩家; 被挡则走另一轴绕开墙/家具
 	var delta: Vector2 = global_position - player.global_position
-	var dir := Vector2.ZERO
-	if absf(delta.x) >= absf(delta.y):
-		dir = Vector2(signf(delta.x), 0)
-	else:
-		dir = Vector2(0, signf(delta.y))
-	if dir == Vector2.ZERO:
+	if delta == Vector2.ZERO:
 		return
-	var target := snap_to_grid(global_position + dir * tile_size)
-	start_walk(target)
+	var primary := Vector2.ZERO
+	var secondary := Vector2.ZERO
+	if absf(delta.x) >= absf(delta.y):
+		primary = Vector2(signf(delta.x), 0)
+		secondary = Vector2(0, signf(delta.y))
+	else:
+		primary = Vector2(0, signf(delta.y))
+		secondary = Vector2(signf(delta.x), 0)
+	_try_step_in_dirs([primary, secondary])
 
 
 ## 阶段1: 脱离战斗 — 从战斗系统移除单位, 但保留在地图上继续逃跑 (用户反馈: 先脱离)
@@ -344,9 +366,15 @@ func _escape_remove_from_world() -> void:
 
 
 func _step_random() -> void:
-	var rand_dir := _rand_dir_4()
-	var target := snap_to_grid(global_position + rand_dir * tile_size)
-	start_walk(target)
+	# 随机方向优先, 被挡则尝试其余 3 向, 避免硬闯墙/货架
+	var dirs: Array[Vector2] = [
+		Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)
+	]
+	var first := randi() % dirs.size()
+	var ordered: Array[Vector2] = []
+	for i in dirs.size():
+		ordered.append(dirs[(first + i) % dirs.size()])
+	_try_step_in_dirs(ordered)
 
 
 func _on_arrived() -> void:

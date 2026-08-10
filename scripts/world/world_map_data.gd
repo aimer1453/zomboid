@@ -223,9 +223,14 @@ func enter_location(x: int, y: int) -> void:
 
 
 func enter_home() -> void:
+	if not get_tree():
+		return
 	player_cell = home_cell
 	last_entry_cell = home_cell
 	has_last_entry = true
+	# 统一进入家园时的状态, 与 dungeon enter_location 的 HOME 分支一致, 避免缺状态导致 UI/输入不初始化而"卡死"
+	if GameManager and GameManager.has_method("change_state"):
+		GameManager.change_state(GameManager.GameState.EXPLORING)
 	get_tree().change_scene_to_file("res://scenes/home_base.tscn")
 
 
