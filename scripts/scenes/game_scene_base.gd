@@ -58,7 +58,7 @@ var _corpses: Array = []
 ## 全场景地面物品列表 (容器丢弃/背包丢出生成, 可拾取)
 var _ground_items: Array = []
 ## 待搜刮的远处尸体: 玩家走到旁边后自动打开其背包 (Issue B 自动寻路)
-var _pending_corpse: Node = null
+var _pending_loot: Node = null
 ## 战争迷雾层 (场景内视野遮蔽, 主角醒来仅视野内可见)
 var _fog: FOW = null
 
@@ -302,26 +302,26 @@ func _on_interact(interact: Node) -> void:
 			print("[场景] 拾取失败: 背包已满或超重")
 		return
 	if _container_ui and interact.has_method("list_inventory"):
-		# 尸体搜刮限制 (Issue B): 玩家须靠近尸体至少 1 格, 除非持有空间系异能可隔空搜刮.
-		# 注意: 仅限 Corpse, 普通家具(衣柜/箱子)仍可原地打开.
-		if interact is CP and not _player_can_loot_corpse(interact):
-			# 不再只提示文字 → 自动寻路走到尸体旁 1 格内, 到达后开包
-			_walk_to_loot_corpse(interact)
+		# 搜刮/开柜距离限制: 玩家须靠近容器至少 1 格(切比雪夫), 除非持有空间系异能可隔空搜刮.
+		# 适用于所有容器: 尸体 / 衣柜 / 储物柜 / 箱子 / 保险箱 / 货架 等.
+		if not _player_can_loot(interact):
+			# 不在范围内 → 自动寻路走到容器旁 1 格内, 到达后由 _on_player_move_completed 开包
+			_walk_to_loot(interact)
 			return
 		var name_str: String = interact.get("furniture_name") if interact.get("furniture_name") != null else interact.name
 		_container_ui.open(interact, name_str)
 
 
-## 玩家是否可搜刮尸体: 默认须距离尸体切比雪夫 ≤1 格 (同格或八方相邻);
+## 玩家是否可搜刮/开柜: 默认须距离容器切比雪夫 ≤1 格 (同格或八方相邻);
 ## 持有"空间系异能"可隔空搜刮 (任意距离). 缺信息时不误杀正常交互.
-func _player_can_loot_corpse(corpse: Node) -> bool:
+func _player_can_loot(container: Node) -> bool:
 	if _has_space_ability():
 		return true
-	if not _player or not corpse.has_method("get_grid_pos"):
+	if not _player or not container.has_method("get_grid_pos"):
 		return true
 	var player_cell := _cell_of(_player.global_position)
-	var corpse_cell: Vector2i = corpse.get_grid_pos()
-	var d := player_cell - corpse_cell
+	var container_cell: Vector2i = container.get_grid_pos()
+	var d := player_cell - container_cell
 	return max(abs(d.x), abs(d.y)) <= 1
 
 
@@ -347,35 +347,35 @@ func _is_space_keyword(s: String) -> bool:
 
 # --- 尸体自动寻路搜刮 (Issue B) ---
 
-## 玩家走到尸体旁后回调: 若有待搜刮尸体且已在 1 格内 → 自动开包
+## 玩家走到容器旁后回调: 若有待搜刮容器且已在 1 格内 → 自动开包
 func _on_player_move_completed() -> void:
-	if not _pending_corpse or not is_instance_valid(_pending_corpse):
-		_pending_corpse = null
+	if not _pending_loot or not is_instance_valid(_pending_loot):
+		_pending_loot = null
 		return
-	if _player_can_loot_corpse(_pending_corpse):
-		var corpse := _pending_corpse
-		_pending_corpse = null  # 先清空, 避免递归
-		if _container_ui and corpse.has_method("list_inventory"):
-			var name_str: String = corpse.get("furniture_name") if corpse.get("furniture_name") != null else corpse.name
-			_container_ui.open(corpse, name_str)
-			print("[场景] 到达尸体旁, 自动打开背包: ", name_str)
+	if _player_can_loot(_pending_loot):
+		var container := _pending_loot
+		_pending_loot = null  # 先清空, 避免递归
+		if _container_ui and container.has_method("list_inventory"):
+			var name_str: String = container.get("furniture_name") if container.get("furniture_name") != null else container.name
+			_container_ui.open(container, name_str)
+			print("[场景] 到达容器旁, 自动打开背包: ", name_str)
 
 
-## 规划路径 → 走到尸体旁边 (1 格内), 到达后由 _on_player_move_completed 自动开包
-func _walk_to_loot_corpse(corpse: Node) -> void:
-	if not _player or not corpse.has_method("get_grid_pos"):
+## 规划路径 → 走到容器旁边 (1 格内), 到达后由 _on_player_move_completed 自动开包
+func _walk_to_loot(container: Node) -> void:
+	if not _player or not container.has_method("get_grid_pos"):
 		return
-	var target_cell := _find_adjacent_walkable_cell(corpse.get_grid_pos())
+	var target_cell := _find_adjacent_walkable_cell(container.get_grid_pos())
 	if target_cell == Vector2i(-1, -1):
-		var msg := "尸体周围没有可通行的位置"
+		var msg := "容器周围没有可通行的位置"
 		print("[场景] ", msg)
 		if _hud and _hud.has_method("append_log"):
 			_hud.append_log(msg)
 		return
-	_pending_corpse = corpse
+	_pending_loot = container
 	_show_selection_arrow(_world_pos(target_cell))
 	_player.move_to_cell(_world_pos(target_cell))
-	print("[场景] 自动走向尸体: ", target_cell)
+	print("[场景] 自动走向容器: ", target_cell)
 
 
 ## 找到目标格最近的可行走邻格 (八方 + 自身, 优先距离玩家当前位置最近).

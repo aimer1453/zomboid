@@ -147,6 +147,7 @@ func _run_auto_test() -> void:
 	_test_combat_blocks_floor_menu()
 	# Issue B 距离限制回归 (全同步, 放最前保证 headless 帧信号不稳时也能跑到)
 	_test_corpse_loot_proximity()
+	_test_furniture_loot_proximity()
 	# 叠尸挪位回归 (全同步, 提前跑确保覆盖)
 	_test_corpse_no_overlap()
 	# 探索连续移动验证: 向左走2格再走回来 (确认移动一次后还能继续移动)
@@ -722,23 +723,23 @@ func _test_corpse_loot_proximity() -> void:
 	corpse_far.setup_corpse(gp_far, tile_size, ["bandage"], "远尸体")
 	add_child(corpse_far)
 	add_corpse(corpse_far)
-	_pending_corpse = null  # 清空遗留
+	_pending_loot = null  # 清空遗留
 	_player.global_position = player_home  # 保持在出生点, 距尸体 3 格
 	if _container_ui:
 		_container_ui.close()
 	var hit_far := _raycast_interactable(_world_pos(gp_far))
 	if hit_far:
 		_on_interact(hit_far)
-		# 新行为: 不再拦截, 而是 _pending_corpse 被设置 + 触发 move_to_cell
-		var triggered_walk: bool = _pending_corpse == corpse_far
+		# 新行为: 不再拦截, 而是 _pending_loot 被设置 + 触发 move_to_cell
+		var triggered_walk: bool = _pending_loot == corpse_far
 		var opened_far: bool = _container_ui != null and _container_ui.is_open()
 		if not triggered_walk:
 			ok = false
-			push_error("[CorpseProx] 远处尸体应触发自动寻路, _pending_corpse 未设置")
+			push_error("[CorpseProx] 远处尸体应触发自动寻路, _pending_loot 未设置")
 		if opened_far:
 			ok = false
 			push_error("[CorpseProx] 远处尸体不应直接开包, 却开了")
-		_pending_corpse = null  # 清理, 避免影响后续
+		_pending_loot = null  # 清理, 避免影响后续
 		if _container_ui:
 			_container_ui.close()
 	else:
@@ -752,7 +753,7 @@ func _test_corpse_loot_proximity() -> void:
 	corpse_near.setup_corpse(gp_near, tile_size, ["bandage"], "近尸体")
 	add_child(corpse_near)
 	add_corpse(corpse_near)
-	_pending_corpse = null
+	_pending_loot = null
 	_player.global_position = _world_pos(gp_near - Vector2i(1, 0))  # 距离 1
 	if _container_ui:
 		_container_ui.close()
@@ -780,7 +781,7 @@ func _test_corpse_loot_proximity() -> void:
 	corpse_space.setup_corpse(gp_space, tile_size, ["bandage"], "空间异能尸体")
 	add_child(corpse_space)
 	add_corpse(corpse_space)
-	_pending_corpse = null
+	_pending_loot = null
 	_player.global_position = player_home  # 仍远处
 	if _container_ui:
 		_container_ui.close()
@@ -801,8 +802,86 @@ func _test_corpse_loot_proximity() -> void:
 	# 恢复玩家位置与异能状态, 避免污染后续测试
 	_player.global_position = player_home
 	_player.learned_abilities = saved_abilities.duplicate()
-	_pending_corpse = null
+	_pending_loot = null
 	print("=== 自动测试: 尸体搜刮距离限制=", ok, " (应为 true)")
+
+
+## 家具/柜子开柜距离限制 (与尸体同规则): 玩家须靠近容器 1 格内才可开柜,
+## 否则自动寻路走到旁 1 格, 到达后开包; 持有空间系异能可隔空开柜.
+func _test_furniture_loot_proximity() -> void:
+	var furn_script: Script = load("res://scripts/tiles/furniture.gd")
+	var ok := true
+	var player_home: Vector2 = _player.global_position
+	var saved_abilities: Array = _player.learned_abilities.duplicate()
+	_player.learned_abilities.clear()  # 无空间异能基线
+
+	# --- 场景1: 远处衣柜 (3 格) → 应触发自动寻路 (不直接开包) ---
+	var gp_far := _cell_of(player_home) + Vector2i(3, 0)
+	var furn_far: Node = furn_script.new()
+	furn_far.setup(gp_far, tile_size, ["canned_food"], 2, "衣柜")
+	add_child(furn_far)
+	_pending_loot = null
+	_player.global_position = player_home
+	if _container_ui:
+		_container_ui.close()
+	_on_interact(furn_far)
+	var triggered_walk: bool = _pending_loot == furn_far
+	var opened_far: bool = _container_ui != null and _container_ui.is_open()
+	if not triggered_walk:
+		ok = false
+		push_error("[FurnProx] 远处衣柜应触发自动寻路, _pending_loot 未设置")
+	if opened_far:
+		ok = false
+		push_error("[FurnProx] 远处衣柜不应直接开包, 却开了")
+	_pending_loot = null
+	if _container_ui:
+		_container_ui.close()
+	furn_far.queue_free()
+
+	# --- 场景2: 玩家挪到衣柜旁 1 格 → 应正常打开 ---
+	var gp_near := _cell_of(player_home) + Vector2i(2, 0)
+	var furn_near: Node = furn_script.new()
+	furn_near.setup(gp_near, tile_size, ["canned_food"], 2, "衣柜")
+	add_child(furn_near)
+	_pending_loot = null
+	_player.global_position = _world_pos(gp_near - Vector2i(1, 0))  # 距离 1
+	if _container_ui:
+		_container_ui.close()
+	_on_interact(furn_near)
+	var opened_near: bool = _container_ui != null and _container_ui.is_open()
+	if not opened_near:
+		ok = false
+		push_error("[FurnProx] 玩家在 1 格内应可开柜, 容器却未开")
+	if _container_ui:
+		_container_ui.close()
+	furn_near.queue_free()
+
+	# --- 场景3: 持空间系异能 → 远处衣柜也可隔空开柜 (直接开包) ---
+	var space_action: Resource = CA.new()
+	space_action.action_id = "test_space_loot"
+	space_action.ability_category = "space"
+	_player.learned_abilities.append(space_action)
+	var gp_space := _cell_of(player_home) + Vector2i(4, 0)
+	var furn_space: Node = furn_script.new()
+	furn_space.setup(gp_space, tile_size, ["canned_food"], 2, "衣柜")
+	add_child(furn_space)
+	_pending_loot = null
+	_player.global_position = player_home  # 仍远处
+	if _container_ui:
+		_container_ui.close()
+	_on_interact(furn_space)
+	var opened_space: bool = _container_ui != null and _container_ui.is_open()
+	if not opened_space:
+		ok = false
+		push_error("[FurnProx] 持有空间系异能应可隔空开柜, 容器却未开")
+	if _container_ui:
+		_container_ui.close()
+	furn_space.queue_free()
+
+	_player.global_position = player_home
+	_player.learned_abilities = saved_abilities.duplicate()
+	_pending_loot = null
+	print("=== 自动测试: 家具开柜距离限制=", ok, " (应为 true)")
 
 
 ## 4×4 空格子回归: 拿完所有物品后, 容器 UI 应渲染 16 个格子(物品格+空格子)
