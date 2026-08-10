@@ -69,9 +69,9 @@ func _build_ui() -> void:
 	_title = Label.new()
 	_title.text = "末 日 生 存"
 	_title.add_theme_font_size_override("font_size", TITLE_HOME_FONT)
-	# home 态: 配色深蓝 #4E7D96 (深色渐变背景上醒目); select 态由过渡切白字 (蓝 header 上可见)
-	_title.add_theme_color_override("font_color", Palette.BLUE)
-	_title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.55))
+	# 标题统一白色 (home 态浅蓝背景 / select 态蓝 header 上都清晰)
+	_title.add_theme_color_override("font_color", Palette.LIGHT)
+	_title.add_theme_color_override("font_outline_color", Color(0.02, 0.04, 0.10, 0.8))
 	_title.add_theme_constant_override("outline_size", 6)
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_title.z_index = 10
@@ -287,7 +287,9 @@ func _build_select_ui(root: Control) -> void:
 	_fab.offset_bottom = -32
 	_fab.add_theme_font_size_override("font_size", 24)
 	_fab.add_theme_color_override("font_color", Palette.LIGHT)
-	_fab.mouse_filter = Control.MOUSE_FILTER_IGNORE  # home 态透明不拦截, 进入 select 由动画回调恢复
+	# 直接 STOP: 父 select_root 的 visible 已控制拾取 (home 态不可见时不参与, select 态可点),
+	# 不依赖动画回调 — 之前 IGNORE + 回调设 STOP, 回调若未执行则永远点不动
+	_fab.mouse_filter = Control.MOUSE_FILTER_STOP
 	_style_fab(_fab)
 	_fab.pressed.connect(_on_start)
 	root.add_child(_fab)
@@ -306,9 +308,6 @@ func _transition_select() -> void:
 	_select_root.modulate.a = 1.0
 	_select_root.position.y = 180.0
 	_title.pivot_offset = _title.size / 2.0
-	# select 态: 标题切白字 + 深描边 (在蓝色 header 上可见)
-	_title.add_theme_color_override("font_color", Palette.LIGHT)
-	_title.add_theme_color_override("font_outline_color", Color(0.02, 0.04, 0.10, 0.8))
 	var tw := create_tween()
 	tw.set_parallel(true)
 	tw.tween_property(_title, "position", TITLE_SELECT_POS, 0.42) \
@@ -333,9 +332,6 @@ func _transition_home() -> void:
 	_home_btns.visible = true
 	_home_btns.modulate.a = 0.0
 	_back_btn.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# home 态: 标题切回配色深蓝
-	_title.add_theme_color_override("font_color", Palette.BLUE)
-	_title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.55))
 	var tw := create_tween()
 	tw.set_parallel(true)
 	tw.tween_property(_title, "position", TITLE_HOME_POS, 0.42) \
