@@ -547,8 +547,9 @@ func _build_tutorial_banner() -> void:
 	_tutorial_banner.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	_tutorial_banner.offset_left = 40
 	_tutorial_banner.offset_right = -40
-	_tutorial_banner.offset_top = 100
-	_tutorial_banner.offset_bottom = 156
+	# 移到战斗日志(104..312)下方, 避免与日志重叠; 加高容纳 2~3 行自动换行文案
+	_tutorial_banner.offset_top = 322
+	_tutorial_banner.offset_bottom = 404
 	# 关键: 横幅本体 MOUSE_FILTER_IGNORE — 纯提示, 不能拦截下方游戏点击
 	# (修复: STOP 横条挡中上部格子的家具/丧尸点击; 关闭/跳过走独立按钮)
 	_tutorial_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -571,9 +572,12 @@ func _build_tutorial_banner() -> void:
 	_tutorial_label = Label.new()
 	_tutorial_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_tutorial_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	# 自动换行: 教程文案在手机竖屏宽度下会超长, 不换行则右侧被截断
+	_tutorial_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_tutorial_label.add_theme_font_size_override("font_size", 17)
 	_tutorial_label.add_theme_color_override("font_color", Color(0.9, 0.92, 1.0))
 	_tutorial_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_tutorial_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	hbox.add_child(_tutorial_label)
 
 	# 跳过教程按钮 (独立小按钮, 默认 STOP — 只占按钮区域, 不挡游戏)
