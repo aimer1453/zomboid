@@ -625,8 +625,9 @@ func _build_button() -> void:
 	var bar := HBoxContainer.new()
 	bar.add_theme_constant_override("separation", 10)
 	bar.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	bar.offset_left = -160
-	bar.offset_right = 160
+	# 4 按钮 ×94 + 3×10 间距 = 406px, 容器须 ≥420 (720 设计宽下防溢出)
+	bar.offset_left = -214
+	bar.offset_right = 214
 	bar.offset_top = -104
 	bar.offset_bottom = -16
 	bar.alignment = BoxContainer.ALIGNMENT_CENTER

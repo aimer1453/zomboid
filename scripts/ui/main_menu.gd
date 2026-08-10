@@ -36,27 +36,27 @@ func _build_ui() -> void:
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
-	# 居中列
+	# 竖屏居中列 (720x1280 设计分辨率, 手机习惯: 顶部标题 → 角色网格 → 详情 → 开始)
 	var vbox := VBoxContainer.new()
 	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
-	vbox.offset_left = 60
-	vbox.offset_right = -60
-	vbox.offset_top = 40
-	vbox.offset_bottom = -40
-	vbox.add_theme_constant_override("separation", 18)
+	vbox.offset_left = 40
+	vbox.offset_right = -40
+	vbox.offset_top = 32
+	vbox.offset_bottom = -32
+	vbox.add_theme_constant_override("separation", 12)
 	add_child(vbox)
 
 	var title := Label.new()
 	title.text = "末 日 生 存"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 46)
+	title.add_theme_font_size_override("font_size", 42)
 	title.add_theme_color_override("font_color", Color(0.9, 0.25, 0.2))
 	vbox.add_child(title)
 
 	var sub := Label.new()
 	sub.text = "选择你的幸存者"
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sub.add_theme_font_size_override("font_size", 20)
+	sub.add_theme_font_size_override("font_size", 17)
 	sub.add_theme_color_override("font_color", Color(0.7, 0.75, 0.8))
 	vbox.add_child(sub)
 
@@ -64,20 +64,22 @@ func _build_ui() -> void:
 	if GameManager.has_save():
 		var cont := Button.new()
 		cont.text = "继续游戏"
-		cont.custom_minimum_size = Vector2(240, 54)
-		cont.add_theme_font_size_override("font_size", 20)
+		cont.custom_minimum_size = Vector2(220, 44)
+		cont.add_theme_font_size_override("font_size", 18)
 		cont.pressed.connect(_on_continue)
 		vbox.add_child(cont)
 
-	# 角色卡片行
-	var card_row := HBoxContainer.new()
-	card_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	card_row.add_theme_constant_override("separation", 14)
-	vbox.add_child(card_row)
+	# 角色卡片网格: 2 列 (5 卡 → 3 行, 手机习惯; 720 宽 - 边距 80 = 640, 每卡 ~306)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 12)
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_child(grid)
 	for id in CHAR_ORDER:
 		var card := _make_card(id)
 		_cards[id] = card
-		card_row.add_child(card)
+		grid.add_child(card)
 
 	# 详情面板
 	var detail := PanelContainer.new()
@@ -86,47 +88,48 @@ func _build_ui() -> void:
 	dsb.border_color = Color(0.4, 0.4, 0.5)
 	dsb.set_border_width_all(2)
 	dsb.set_corner_radius_all(12)
-	dsb.content_margin_left = 22
-	dsb.content_margin_right = 22
-	dsb.content_margin_top = 16
-	dsb.content_margin_bottom = 16
+	dsb.content_margin_left = 18
+	dsb.content_margin_right = 18
+	dsb.content_margin_top = 12
+	dsb.content_margin_bottom = 12
 	detail.add_theme_stylebox_override("panel", dsb)
+	detail.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.add_child(detail)
 
 	var dvbox := VBoxContainer.new()
-	dvbox.add_theme_constant_override("separation", 8)
+	dvbox.add_theme_constant_override("separation", 6)
 	detail.add_child(dvbox)
 
 	_detail_title = Label.new()
-	_detail_title.add_theme_font_size_override("font_size", 24)
+	_detail_title.add_theme_font_size_override("font_size", 22)
 	dvbox.add_child(_detail_title)
 
 	_detail_series = Label.new()
-	_detail_series.add_theme_font_size_override("font_size", 15)
+	_detail_series.add_theme_font_size_override("font_size", 13)
 	_detail_series.add_theme_color_override("font_color", Color(0.95, 0.8, 0.3))
 	dvbox.add_child(_detail_series)
 
 	_detail_bg = Label.new()
 	_detail_bg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_detail_bg.add_theme_font_size_override("font_size", 14)
+	_detail_bg.add_theme_font_size_override("font_size", 13)
 	_detail_bg.add_theme_color_override("font_color", Color(0.82, 0.84, 0.88))
 	dvbox.add_child(_detail_bg)
 
 	var qlabel := Label.new()
 	qlabel.text = "主线任务"
-	qlabel.add_theme_font_size_override("font_size", 16)
+	qlabel.add_theme_font_size_override("font_size", 14)
 	qlabel.add_theme_color_override("font_color", Color(0.6, 0.85, 0.7))
 	dvbox.add_child(qlabel)
 
 	_detail_quest = VBoxContainer.new()
-	_detail_quest.add_theme_constant_override("separation", 4)
+	_detail_quest.add_theme_constant_override("separation", 3)
 	dvbox.add_child(_detail_quest)
 
 	# 开始按钮
 	_start_btn = Button.new()
 	_start_btn.text = "开始游戏"
-	_start_btn.custom_minimum_size = Vector2(260, 60)
-	_start_btn.add_theme_font_size_override("font_size", 22)
+	_start_btn.custom_minimum_size = Vector2(240, 52)
+	_start_btn.add_theme_font_size_override("font_size", 20)
 	_start_btn.pressed.connect(_on_start)
 	vbox.add_child(_start_btn)
 
@@ -137,24 +140,25 @@ func _build_ui() -> void:
 func _make_card(id: int) -> Button:
 	var unlocked: bool = GameManager.is_character_unlocked(id)
 	var card := Button.new()
-	card.custom_minimum_size = Vector2(180, 220)
-	card.add_theme_font_size_override("font_size", 16)
+	card.custom_minimum_size = Vector2(0, 128)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.add_theme_font_size_override("font_size", 15)
 	card.pressed.connect(_select.bind(id))
 
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 8)
+	col.add_theme_constant_override("separation", 3)
 
 	var name_l := Label.new()
 	name_l.text = GameManager.get_character_name(id)
 	name_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name_l.add_theme_font_size_override("font_size", 22)
+	name_l.add_theme_font_size_override("font_size", 19)
 	col.add_child(name_l)
 
 	var series_l := Label.new()
 	series_l.text = GameManager.get_character_series(id)
 	series_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	series_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	series_l.add_theme_font_size_override("font_size", 12)
+	series_l.add_theme_font_size_override("font_size", 11)
 	series_l.add_theme_color_override("font_color", Color(0.95, 0.8, 0.3))
 	col.add_child(series_l)
 
@@ -162,21 +166,21 @@ func _make_card(id: int) -> Button:
 		var tag := Label.new()
 		tag.text = "● 已解锁"
 		tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		tag.add_theme_font_size_override("font_size", 13)
+		tag.add_theme_font_size_override("font_size", 12)
 		tag.add_theme_color_override("font_color", Color(0.5, 0.9, 0.5))
 		col.add_child(tag)
 	else:
 		var lock := Label.new()
 		lock.text = "🔒 未解锁"
 		lock.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		lock.add_theme_font_size_override("font_size", 13)
+		lock.add_theme_font_size_override("font_size", 12)
 		lock.add_theme_color_override("font_color", Color(0.7, 0.4, 0.4))
 		col.add_child(lock)
 		var hint := Label.new()
 		hint.text = GameManager.get_unlock_hint(id)
 		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		hint.add_theme_font_size_override("font_size", 11)
+		hint.add_theme_font_size_override("font_size", 10)
 		hint.add_theme_color_override("font_color", Color(0.6, 0.6, 0.68))
 		col.add_child(hint)
 
