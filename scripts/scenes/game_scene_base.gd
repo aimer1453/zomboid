@@ -141,8 +141,15 @@ func _init_fog_of_war() -> void:
 				tm = ch
 				break
 	_fog.setup(tm, tile_size)
+	# 子类可 override 返回固定键(如 "home_base")让该场景视野跨进入保留; 默认空=每次重置
+	_fog.set_memory_key(_fog_memory_key())
 	if _player != null:
 		_fog.reveal_from(_cell_of(_player.global_position))
+
+
+## 迷雾记忆键: 默认空(不持久化, 每次进入重置); 子类 override 可让特定场景视野跨进入保留
+func _fog_memory_key() -> String:
+	return ""
 
 
 ## 小地图: CanvasLayer(layer=50, 在 HUD layer=60 之下) 内放一个 FULL_RECT Control 自绘

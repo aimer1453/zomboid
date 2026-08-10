@@ -26,6 +26,9 @@ var _map_min: Vector2i = Vector2i.ZERO
 var _map_max: Vector2i = Vector2i.ZERO
 var _explored: Dictionary = {}   # "x,y" -> true (永久记忆)
 var _visible: Dictionary = {}    # "x,y" -> true (当前视野内)
+var _mem_key: String = ""        # 该场景在全局记忆中的键; 空=不持久化(每次进入重置)
+# 全局常驻记忆: key -> { "x,y": true }; 跨场景进入(回家再进家园)保留, 进程内常驻
+static var _memories: Dictionary = {}
 var _ready_init: bool = false
 var _last_count: int = -1
 var _last_tilemap: Node = null
@@ -36,6 +39,35 @@ func setup(tilemap: Node, ts: int) -> void:
 	_tilemap = tilemap
 	_recompute_bounds()
 	_ready_init = true
+
+
+## 设置记忆键并从全局常驻记忆恢复该场景已探索格 (跨进入保留视野)
+func set_memory_key(k: String) -> void:
+	_mem_key = k
+	if k != "" and _memories.has(k):
+		_explored = _memories[k].duplicate()
+
+
+## 把当前探索记忆写回全局常驻字典 (离开场景前调用, 或每次 reveal 后)
+func persist_memory() -> void:
+	if _mem_key != "":
+		_memories[_mem_key] = _explored.duplicate()
+
+
+## --- 全局记忆的存档接口 (常驻进程内, 随存档序列化) ---
+static func serialize_memories() -> Dictionary:
+	return _memories.duplicate(true)
+
+
+static func deserialize_memories(d: Dictionary) -> void:
+	if d is Dictionary:
+		_memories = d.duplicate(true)
+	else:
+		_memories.clear()
+
+
+static func clear_memories() -> void:
+	_memories.clear()
 
 
 ## 依据 _tilemap 的 used_cells 重算地图包围盒 (换层/重建地图时调用)
@@ -84,6 +116,7 @@ func reveal_from(player_cell: Vector2i) -> void:
 			_explored[key] = true
 	_visible = new_visible
 	queue_redraw()
+	persist_memory()
 
 
 ## 调试/特殊场景: 显示全图 (取消迷雾)
@@ -95,6 +128,7 @@ func reveal_all() -> void:
 		for x in range(_map_min.x, _map_max.x + 1):
 			_explored["%d,%d" % [x, y]] = true
 	queue_redraw()
+	persist_memory()
 
 
 ## 公开查询: 供小地图复用探索/可见状态

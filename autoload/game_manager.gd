@@ -184,6 +184,9 @@ func start_new_game(character: CharacterID) -> void:
 	# 新游戏: 重置无限世界地图 (家在原点, 全新探索)
 	if WorldMapData:
 		WorldMapData.reset_map()
+	# 新游戏: 清空场景内迷雾记忆 (避免上一周目残留家园视野)
+	if FogOfWar:
+		FogOfWar.clear_memories()
 	# 新游戏: 家园醒来 + 新手引导 (P1 开场流程)
 	_tutorial_active = true
 	change_state(GameState.EXPLORING)
@@ -406,6 +409,9 @@ func save_game_slot(slot: int) -> bool:
 	# 无限世界地图持久化 (已生成地形 + 已探索视野 + 主角位置)
 	if WorldMapData:
 		data["world_map"] = WorldMapData.serialize()
+	# 场景内迷雾记忆持久化 (家园等固定场景的已开视野)
+	if FogOfWar:
+		data["fog"] = FogOfWar.serialize_memories()
 	# P0: 主角状态全量入档
 	var player := TurnManager.get_player()
 	if player and player.has_method("serialize"):
@@ -436,6 +442,9 @@ func load_game_slot(slot: int) -> bool:
 	# 无限世界地图恢复 (已生成地形 + 已探索视野 + 主角位置)
 	if WorldMapData and data.has("world_map"):
 		WorldMapData.deserialize(data["world_map"])
+	# 场景内迷雾记忆恢复 (家园等固定场景的已开视野)
+	if FogOfWar and data.has("fog"):
+		FogOfWar.deserialize_memories(data["fog"])
 	# P0: 主角状态暂存, 场景加载后应用到 Player 节点
 	_pending_player_data = data.get("player", {})
 	change_state(GameState.EXPLORING)

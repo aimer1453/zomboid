@@ -55,6 +55,10 @@ var _build_kind: int = -1
 
 # --- 地图生成 ---
 
+## 家园是固定基地: 迷雾记忆跨进入保留 (出去探图再回家, 已开视野不丢)
+func _fog_memory_key() -> String:
+	return "home_base"
+
 func _create_world() -> void:
 	print("[HomeBase] 生成家园...")
 	_tilemap = DTM.new()  # 自定义绘制 (TileMapLayer 在本项目渲染不可靠, 见 memory)
