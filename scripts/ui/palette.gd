@@ -18,6 +18,19 @@ const CARD_BORDER_UNSEL := Color(0.32, 0.42, 0.55, 0.8)
 const CARD_BORDER_SEL   := Color("#FF844B")  # 选中态: 橙色边框
 const ACCENT_GRADIENT := [Color("#FF844B"), Color("#E3EDF2")]  # 强调渐变 (橙→浅)
 
+## 卡片化 App 风格 (手机 UI 参考: 圆角 header + 白色内容卡 + 彩色 tag + FAB)
+const HEADER_BG    := Color("#4E7D96")    # Header 大色块 (蓝)
+const HEADER_BG_DARK := Color("#3A5E73")  # Header 底部稍深 (装饰条)
+const CARD_LIGHT_BG := Color(0.96, 0.97, 0.98)  # 内容白色大卡
+const CARD_LIGHT_ROW := Color(0.94, 0.95, 0.96)  # 列表行 (灰白)
+const CARD_LIGHT_ROW_SEL := Color(0.99, 0.94, 0.88) # 选中行 (浅橙白)
+const TAG_BG_BLUE  := Color("#4E7D96")  # Tag 蓝底
+const TAG_BG_ORANGE := Color("#FF844B")  # Tag 橙底
+const TAG_BG_LOCK  := Color(0.60, 0.62, 0.70)  # Tag 灰 (锁)
+const SHADOW       := Color(0.04, 0.05, 0.10, 0.18)  # 卡片阴影
+const NAV_BG       := Color(0.97, 0.97, 0.98)  # 底部导航栏
+const NAV_ICON_DIM := Color(0.50, 0.55, 0.65)  # 未选 icon
+
 ## 文本
 const TEXT_PRIMARY   := Color("#E3EDF2")
 const TEXT_SECONDARY := Color("#FF844B")  # 系列文字 — 橙
