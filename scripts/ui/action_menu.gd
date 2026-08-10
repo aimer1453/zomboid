@@ -96,14 +96,15 @@ func _on_generic_pressed(cb: Callable) -> void:
 		cb.call()
 
 
-## 面板定位 (避免出屏)
+## 面板定位 (避免出屏) — 用内容实际最小尺寸钳位, 动作数多时也不会溢出底部
 func _position_panel(screen_pos: Vector2) -> void:
 	var viewport_size := get_viewport().get_visible_rect().size
+	var psize: Vector2 = _panel.get_combined_minimum_size()
 	var pos := screen_pos + Vector2(12, 12)
-	if pos.x + 190 > viewport_size.x:
-		pos.x = maxf(viewport_size.x - 200, 4)
-	if pos.y + 280 > viewport_size.y:
-		pos.y = maxf(viewport_size.y - 300, 4)
+	if psize.x > 0 and pos.x + psize.x > viewport_size.x:
+		pos.x = maxf(viewport_size.x - psize.x - 8, 4)
+	if psize.y > 0 and pos.y + psize.y > viewport_size.y:
+		pos.y = maxf(viewport_size.y - psize.y - 8, 4)
 	_panel.position = pos
 	_panel.visible = true
 

@@ -74,7 +74,8 @@ func _draw() -> void:
 	var draw_w: float = map_w * scale
 	var draw_h: float = map_h * scale
 	var ox: float = size.x - margin - draw_w
-	var oy: float = margin
+	# 下移避开 HUD 状态栏 (y=12..96) 与战斗日志 (y=104..312): 小地图 y=112..~282
+	var oy: float = margin + 102.0
 	var cw: float = float(ts) * scale + 0.5
 
 	# 外框

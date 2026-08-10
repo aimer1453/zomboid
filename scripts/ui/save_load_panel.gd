@@ -79,10 +79,10 @@ func _build_panel() -> void:
 		_slot_containers.append(slot_ui)
 		vbox.add_child(slot_ui)
 
-	# 关闭按钮
+	# 关闭按钮 (面板 480 宽 - 左右边距 24*2 = 内容 432, 按钮须 ≤432 防溢出)
 	var close_btn := Button.new()
 	close_btn.text = "关闭"
-	close_btn.custom_minimum_size = Vector2(440, 44)
+	close_btn.custom_minimum_size = Vector2(424, 44)
 	close_btn.add_theme_font_size_override("font_size", 16)
 	close_btn.pressed.connect(close)
 	vbox.add_child(close_btn)
