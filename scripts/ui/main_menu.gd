@@ -106,6 +106,7 @@ func _build_ui() -> void:
 	# ============ 选择界面 (初始整体下移+透明, 由动画滑入) ============
 	_select_root = Control.new()
 	_select_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_select_root.visible = false  # home 态不可见 → 完全不参与鼠标拾取
 	_select_root.modulate.a = 0.0
 	_select_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_select_root.position.y = 140
@@ -121,6 +122,7 @@ func _build_ui() -> void:
 	_back_btn.add_theme_font_size_override("font_size", 16)
 	UiStyle.apply_button(_back_btn, UiStyle.pill_button_states(Palette.LIGHT))
 	_back_btn.modulate.a = 0.0
+	_back_btn.mouse_filter = Control.MOUSE_FILTER_IGNORE  # home 态透明不拦截
 	_back_btn.z_index = 20
 	_back_btn.pressed.connect(_transition_home)
 	add_child(_back_btn)
@@ -187,6 +189,9 @@ func _build_select_ui(root: Control) -> void:
 	card.offset_bottom = -20
 	card.offset_left = 16
 	card.offset_right = -16
+	# 关键: home 态下 card 透明(modulate 0)但默认 STOP 会拦截下方主按钮点击!
+	# card 本体 IGNORE, 交互交给内部角色行(各自 STOP) — 透明时不挡, 显示时可点
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var csb := StyleBoxFlat.new()
 	csb.bg_color = Palette.CARD_LIGHT_BG
 	csb.set_corner_radius_all(24)
@@ -273,6 +278,7 @@ func _build_select_ui(root: Control) -> void:
 	_fab.offset_bottom = -32
 	_fab.add_theme_font_size_override("font_size", 24)
 	_fab.add_theme_color_override("font_color", Palette.LIGHT)
+	_fab.mouse_filter = Control.MOUSE_FILTER_IGNORE  # home 态透明不拦截, 进入 select 由动画回调恢复
 	_style_fab(_fab)
 	_fab.pressed.connect(_on_start)
 	root.add_child(_fab)
@@ -285,6 +291,11 @@ func _transition_select() -> void:
 	if _state == "select":
 		return
 	_state = "select"
+	# select_root 用 visible 控制拾取: 先显示(modulate 0 透明), 动画淡入
+	# (visible=false 的 Control 不参与鼠标拾取 — 根治 home 态透明子节点拦截点击)
+	_select_root.visible = true
+	_select_root.modulate.a = 0.0
+	_select_root.position.y = 140.0
 	_title.pivot_offset = _title.size / 2.0
 	var tw := create_tween()
 	tw.set_parallel(true)
@@ -299,7 +310,7 @@ func _transition_select() -> void:
 	tw.tween_property(_back_btn, "modulate:a", 1.0, 0.3)
 	tw.chain().tween_callback(func() -> void:
 		_home_btns.visible = false
-		_select_root.mouse_filter = Control.MOUSE_FILTER_STOP)
+		_back_btn.mouse_filter = Control.MOUSE_FILTER_STOP)
 
 
 ## 选择 → 主页面 (返回)
@@ -307,8 +318,9 @@ func _transition_home() -> void:
 	if _state == "home":
 		return
 	_state = "home"
-	_select_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_home_btns.visible = true
+	_home_btns.modulate.a = 0.0
+	_back_btn.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var tw := create_tween()
 	tw.set_parallel(true)
 	tw.tween_property(_title, "position", TITLE_HOME_POS, 0.42) \
@@ -320,6 +332,8 @@ func _transition_home() -> void:
 	tw.tween_property(_select_root, "position:y", 140.0, 0.4) \
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
 	tw.tween_property(_back_btn, "modulate:a", 0.0, 0.2)
+	tw.chain().tween_callback(func() -> void:
+		_select_root.visible = false)
 
 
 ## 角色列表行: 圆形 avatar + 名字 + 系列 + 状态 tag + 整行可点击

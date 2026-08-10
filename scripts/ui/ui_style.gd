@@ -64,14 +64,15 @@ static func pill_button_states(accent: Color, radius: int = 18) -> Dictionary:
 	}
 
 
-## 应用按钮 (普通 → 主 CTA / 胶囊)
+## 应用按钮 (普通 → 主 CTA / 胶囊); states: {"normal": StyleBoxFlat, ..., "font_normal": Color, ...}
 static func apply_button(b: Button, states: Dictionary) -> void:
 	for k in states:
 		var v = states[k]
 		if v is StyleBoxFlat:
 			b.add_theme_stylebox_override(k, v)
-		else:
-			b.add_theme_color_override("font_" + k, v)
+		elif k.begins_with("font_"):
+			# key 已是完整颜色覆盖名 (如 font_normal), 直接使用
+			b.add_theme_color_override(k, v)
 
 
 ## 应用文本色 (按语义)
